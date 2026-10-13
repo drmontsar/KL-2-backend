@@ -6,8 +6,10 @@ import { config } from './config';
 import { logger } from './logger';
 import { admissionsRouter } from './routes/admissions';
 import { diagnosesRouter } from './routes/diagnoses';
+import { eventsRouter } from './routes/events';
 import { handoffsRouter } from './routes/handoffs';
 import { notesRouter } from './routes/notes';
+import { notificationsRouter } from './routes/notifications';
 import { ordersRouter, tasksRouter } from './routes/orders';
 import { patientsRouter } from './routes/patients';
 import { usersRouter } from './routes/users';
@@ -50,6 +52,8 @@ app.route('/orders', ordersRouter);
 app.route('/tasks', tasksRouter);
 app.route('/diagnoses', diagnosesRouter);
 app.route('/handoffs', handoffsRouter);
+app.route('/notifications', notificationsRouter);
+app.route('/events', eventsRouter);
 
 app.doc('/openapi.json', {
   openapi: '3.0.0',

@@ -10,6 +10,7 @@ import {
   updateAdmission,
 } from '../db/queries/admissions';
 import { createHandoff } from '../db/queries/handoffs';
+import { createNotification } from '../db/queries/notifications';
 import { listVitalsByAdmission, recordVitals } from '../db/queries/vitals';
 import { createDiagnosis } from '../db/queries/diagnoses';
 import {
@@ -500,6 +501,11 @@ admissionsRouter.openapi(
       requested_by,
       assigned_to: admission.assigned_to,
       reason,
+    });
+    await createNotification({
+      user_id: admission.assigned_to,
+      type: 'handoff.created',
+      payload: { handoff_id: handoff.id, admission_id: id, reason: reason ?? null },
     });
     return c.json(handoff, 201);
   }

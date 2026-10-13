@@ -107,6 +107,15 @@ export const OrderSchema = z.object({
   confirmed_at: z.string().nullable(),
 });
 
+export const NotificationSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  type: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  read_at: z.string().nullable(),
+  created_at: z.string(),
+});
+
 export const VitalsSchema = z.object({
   id: z.string().uuid(),
   admission_id: z.string().uuid(),

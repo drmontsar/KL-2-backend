@@ -5,6 +5,7 @@ import {
   doneHandoff,
   listHandoffs,
 } from '../db/queries/handoffs';
+import { createNotification } from '../db/queries/notifications';
 import { ErrorSchema, HandoffSchema, IdParam } from './schemas';
 
 const ListHandoffsQuery = z.object({
@@ -63,6 +64,11 @@ handoffsRouter.openapi(
     if (!handoff) {
       return c.json({ error: 'not found or not pending' }, 404);
     }
+    await createNotification({
+      user_id: handoff.requested_by,
+      type: 'handoff.acknowledged',
+      payload: { handoff_id: handoff.id, admission_id: handoff.admission_id, acknowledged_by },
+    });
     return c.json(handoff, 200);
   }
 );
@@ -90,6 +96,11 @@ handoffsRouter.openapi(
     if (!handoff) {
       return c.json({ error: 'not found or already done' }, 404);
     }
+    await createNotification({
+      user_id: handoff.requested_by,
+      type: 'handoff.done',
+      payload: { handoff_id: handoff.id, admission_id: handoff.admission_id },
+    });
     return c.json(handoff, 200);
   }
 );
