@@ -1,0 +1,25 @@
+{
+  "name": "kl-phase2-backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "server": "bun run src/backend/server.ts",
+    "migrate": "bun run src/backend/db/migrate.ts",
+    "seed": "bun run src/backend/db/seed.ts",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/swagger-ui": "^0.6.1",
+    "@hono/zod-openapi": "^1.6.3",
+    "hono": "^4.13.13",
+    "pino": "^10.4.0",
+    "postgres": "^3.4.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "pino-pretty": "^13.2.0",
+    "typescript": "~6.0.2"
+  }
+}

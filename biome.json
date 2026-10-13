@@ -1,0 +1,10 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "extends": ["ultracite"],
+  "overrides": [
+    {
+      "include": ["tsconfig*.json"],
+      "json": { "parser": { "allowComments": true } }
+    }
+  ]
+}
