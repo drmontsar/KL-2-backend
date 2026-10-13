@@ -135,6 +135,26 @@ export function listTasksByAdmission(
   `;
 }
 
+export function listTasksByNurse(
+  nurse_id: string,
+  status?: Task['status']
+): Promise<Task[]> {
+  if (status) {
+    return db<Task[]>`
+      SELECT t.* FROM clinical.tasks t
+      JOIN clinical.admissions a ON a.id = t.admission_id
+      WHERE a.assigned_to = ${nurse_id} AND t.status = ${status}
+      ORDER BY t.due_at NULLS LAST, t.created_at
+    `;
+  }
+  return db<Task[]>`
+    SELECT t.* FROM clinical.tasks t
+    JOIN clinical.admissions a ON a.id = t.admission_id
+    WHERE a.assigned_to = ${nurse_id}
+    ORDER BY t.due_at NULLS LAST, t.created_at
+  `;
+}
+
 export async function completeTask(data: {
   task_id: string;
   completed_by: string;

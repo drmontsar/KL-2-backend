@@ -348,8 +348,9 @@ const ALLERGENS = [
 
 logger.info('Seeding database');
 
-// 1 — Clear all clinical data (FK order: tasks → orders → notes/note_versions/amendments → diagnoses → admissions → patients)
-await db`TRUNCATE clinical.audit_log, clinical.tasks, clinical.orders,
+// 1 — Clear all clinical data (FK order matters)
+await db`TRUNCATE clinical.audit_log, clinical.handoffs, clinical.vitals,
+         clinical.tasks, clinical.orders,
          clinical.amendments, clinical.note_versions, clinical.notes,
          clinical.diagnoses, clinical.admissions, clinical.patients CASCADE`;
 
@@ -577,6 +578,86 @@ for (const adm of activeAdmissions) {
   }
 }
 logger.info(`Seeded ${orderCount} orders, ${taskCount} tasks`);
+
+// 8 — Vitals for active admissions (2-4 readings each, spaced hours apart)
+const VITALS_BY_WARD: Record<string, { bp: [number, number]; hr: [number, number]; spo2: [number, number]; temp: [number, number]; glucose: [number, number] }> = {
+  Cardiology:        { bp: [130, 160], hr: [70, 110], spo2: [92, 98], temp: [36.5, 37.8], glucose: [90, 160] },
+  Neurology:         { bp: [120, 155], hr: [60, 95],  spo2: [94, 99], temp: [36.5, 38.2], glucose: [85, 130] },
+  Orthopedics:       { bp: [115, 145], hr: [65, 90],  spo2: [95, 99], temp: [36.8, 38.5], glucose: [80, 120] },
+  Respiratory:       { bp: [120, 150], hr: [75, 105], spo2: [88, 97], temp: [36.5, 39.0], glucose: [90, 140] },
+  'General Medicine':{ bp: [125, 155], hr: [68, 95],  spo2: [93, 99], temp: [36.6, 38.8], glucose: [100, 200] },
+  ICU:               { bp: [80,  160], hr: [50, 130], spo2: [85, 98], temp: [36.0, 40.0], glucose: [60, 250] },
+};
+
+function randFloat(min: number, max: number, dp = 1) {
+  return parseFloat((Math.random() * (max - min) + min).toFixed(dp));
+}
+
+let vitalsCount = 0;
+for (const adm of activeAdmissions) {
+  const range = VITALS_BY_WARD[adm.ward] ?? VITALS_BY_WARD['General Medicine'];
+  const numReadings = rand(2, 4);
+  for (let r = 0; r < numReadings; r++) {
+    const hoursBack = (numReadings - r) * rand(4, 8);
+    await db`
+      INSERT INTO clinical.vitals
+        (admission_id, recorded_by, recorded_at, bp_systolic, bp_diastolic, heart_rate, spo2, resp_rate, temperature, glucose)
+      VALUES (
+        ${adm.id}, ${NURSE_ID},
+        ${hoursAgo(hoursBack)},
+        ${rand(range.bp[0], range.bp[1])},
+        ${rand(60, 90)},
+        ${rand(range.hr[0], range.hr[1])},
+        ${randFloat(range.spo2[0], range.spo2[1])},
+        ${rand(14, 22)},
+        ${randFloat(range.temp[0], range.temp[1])},
+        ${rand(range.glucose[0], range.glucose[1])}
+      )
+    `;
+    vitalsCount++;
+  }
+}
+logger.info(`Seeded ${vitalsCount} vitals readings`);
+
+// 9 — Sample handoffs: ~half of nurse-assigned active admissions
+const assignedAdmissions = insertedAdmissions.filter(
+  (a) => a.status === 'active'
+).slice(0, 30); // first 30 were assigned to NURSE_ID in step 4
+
+const HANDOFF_REASONS = [
+  'STAT IV Furosemide ordered — requires urgent bedside check',
+  '12-lead ECG requested, patient complaining of chest tightness',
+  'Post-procedure monitoring — BP check every 30 min',
+  'Patient confused and agitated, needs reassessment',
+  'New nursing order: strict fluid balance charting commenced',
+  'Wound dressing due, patient requesting pain relief first',
+];
+
+let handoffCount = 0;
+for (let i = 0; i < assignedAdmissions.length; i++) {
+  if (Math.random() > 0.5) continue;
+  const adm = assignedAdmissions[i];
+  const status = Math.random() < 0.5 ? 'pending' : (Math.random() < 0.6 ? 'acknowledged' : 'done');
+  const requestedAt = hoursAgo(rand(1, 6));
+  const acknowledgedAt = status !== 'pending' ? new Date(requestedAt.getTime() + rand(5, 30) * 60_000) : null;
+  const doneAt = status === 'done' ? new Date((acknowledgedAt ?? requestedAt).getTime() + rand(15, 60) * 60_000) : null;
+
+  await db`
+    INSERT INTO clinical.handoffs
+      (admission_id, requested_by, assigned_to, reason, status, requested_at, acknowledged_by, acknowledged_at, done_at)
+    VALUES (
+      ${adm.id}, ${DOCTOR_ID}, ${NURSE_ID},
+      ${pick(HANDOFF_REASONS)},
+      ${status},
+      ${requestedAt},
+      ${status !== 'pending' ? NURSE_ID : null},
+      ${acknowledgedAt},
+      ${doneAt}
+    )
+  `;
+  handoffCount++;
+}
+logger.info(`Seeded ${handoffCount} handoffs`);
 
 await db.end();
 logger.info(`Seeding done. Doctor ID: ${DOCTOR_ID}, Nurse ID: ${NURSE_ID}`);

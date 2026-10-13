@@ -9,6 +9,8 @@ import {
   unassignAdmission,
   updateAdmission,
 } from '../db/queries/admissions';
+import { createHandoff } from '../db/queries/handoffs';
+import { listVitalsByAdmission, recordVitals } from '../db/queries/vitals';
 import { createDiagnosis } from '../db/queries/diagnoses';
 import {
   createNote,
@@ -25,10 +27,12 @@ import {
   AdmissionSchema,
   DiagnosisSchema,
   ErrorSchema,
+  HandoffSchema,
   IdParam,
   NoteSchema,
   OrderSchema,
   TaskSchema,
+  VitalsSchema,
 } from './schemas';
 
 const CreateAdmissionBody = z.object({
@@ -453,5 +457,110 @@ admissionsRouter.openapi(
     const { status } = c.req.valid('query');
     const tasks = await listTasksByAdmission(id, status);
     return c.json(tasks, 200);
+  }
+);
+
+const CreateHandoffBody = z.object({
+  requested_by: z.string().uuid(),
+  reason: z.string().optional(),
+});
+
+admissionsRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/{id}/handoffs',
+    tags: ['Admissions'],
+    request: {
+      params: IdParam,
+      body: { content: { 'application/json': { schema: CreateHandoffBody } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: HandoffSchema } },
+        description: 'Handoff created — nurse notified',
+      },
+      404: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Admission not found or no nurse assigned',
+      },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const { requested_by, reason } = c.req.valid('json');
+    const admission = await getAdmissionById(id);
+    if (!admission || admission.status !== 'active') {
+      return c.json({ error: 'admission not found or not active' }, 404);
+    }
+    if (!admission.assigned_to) {
+      return c.json({ error: 'no nurse assigned to this admission' }, 404);
+    }
+    const handoff = await createHandoff({
+      admission_id: id,
+      requested_by,
+      assigned_to: admission.assigned_to,
+      reason,
+    });
+    return c.json(handoff, 201);
+  }
+);
+
+const VitalsListQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const RecordVitalsBody = z.object({
+  recorded_by: z.string().uuid(),
+  bp_systolic: z.number().int().optional(),
+  bp_diastolic: z.number().int().optional(),
+  heart_rate: z.number().int().optional(),
+  spo2: z.number().optional(),
+  resp_rate: z.number().int().optional(),
+  temperature: z.number().optional(),
+  glucose: z.number().int().optional(),
+});
+
+admissionsRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/{id}/vitals',
+    tags: ['Admissions'],
+    request: { params: IdParam, query: VitalsListQuery },
+    responses: {
+      200: {
+        content: { 'application/json': { schema: z.array(VitalsSchema) } },
+        description: 'Vitals history for this admission, most recent first',
+      },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const { limit } = c.req.valid('query');
+    const vitals = await listVitalsByAdmission(id, limit);
+    return c.json(vitals, 200);
+  }
+);
+
+admissionsRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/{id}/vitals',
+    tags: ['Admissions'],
+    request: {
+      params: IdParam,
+      body: { content: { 'application/json': { schema: RecordVitalsBody } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: VitalsSchema } },
+        description: 'Vitals recorded',
+      },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const data = c.req.valid('json');
+    const vitals = await recordVitals({ ...data, admission_id: id });
+    return c.json(vitals, 201);
   }
 );

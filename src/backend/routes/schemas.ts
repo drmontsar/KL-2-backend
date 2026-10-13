@@ -107,6 +107,33 @@ export const OrderSchema = z.object({
   confirmed_at: z.string().nullable(),
 });
 
+export const VitalsSchema = z.object({
+  id: z.string().uuid(),
+  admission_id: z.string().uuid(),
+  recorded_by: z.string().uuid(),
+  recorded_at: z.string(),
+  bp_systolic: z.number().int().nullable(),
+  bp_diastolic: z.number().int().nullable(),
+  heart_rate: z.number().int().nullable(),
+  spo2: z.number().nullable(),
+  resp_rate: z.number().int().nullable(),
+  temperature: z.number().nullable(),
+  glucose: z.number().int().nullable(),
+});
+
+export const HandoffSchema = z.object({
+  id: z.string().uuid(),
+  admission_id: z.string().uuid(),
+  requested_by: z.string().uuid(),
+  assigned_to: z.string().uuid(),
+  reason: z.string().nullable(),
+  status: z.enum(['pending', 'acknowledged', 'done']),
+  requested_at: z.string(),
+  acknowledged_at: z.string().nullable(),
+  acknowledged_by: z.string().uuid().nullable(),
+  done_at: z.string().nullable(),
+});
+
 export const TaskSchema = z.object({
   id: z.string().uuid(),
   order_id: z.string().uuid(),

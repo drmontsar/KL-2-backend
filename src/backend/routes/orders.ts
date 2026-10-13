@@ -5,6 +5,7 @@ import {
   cancelTask,
   completeTask,
   confirmOrder,
+  listTasksByNurse,
 } from '../db/queries/orders';
 import { ErrorSchema, IdParam, OrderSchema, TaskSchema } from './schemas';
 
@@ -111,6 +112,31 @@ tasksRouter.openapi(
       return c.json({ error: 'not found or not pending' }, 404);
     }
     return c.json(task, 200);
+  }
+);
+
+const TaskListQuery = z.object({
+  nurse_id: z.string().uuid(),
+  status: z.enum(['pending', 'done', 'cancelled']).optional(),
+});
+
+tasksRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/',
+    tags: ['Tasks'],
+    request: { query: TaskListQuery },
+    responses: {
+      200: {
+        content: { 'application/json': { schema: z.array(TaskSchema) } },
+        description: 'Tasks for the given nurse across all their admissions',
+      },
+    },
+  }),
+  async (c) => {
+    const { nurse_id, status } = c.req.valid('query');
+    const tasks = await listTasksByNurse(nurse_id, status);
+    return c.json(tasks, 200);
   }
 );
 
