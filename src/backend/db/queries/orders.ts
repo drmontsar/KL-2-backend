@@ -26,6 +26,9 @@ export type Task = {
   completed_at: Date | null;
   revision: number;
   created_at: Date;
+  // joined from parent order
+  order_kind: 'medication' | 'investigation' | 'nursing';
+  order_payload: Record<string, unknown>;
 };
 
 export async function createOrder(data: {
@@ -117,21 +120,27 @@ export async function cancelOrder(id: string): Promise<Order | null> {
 
 // Tasks
 
+const TASK_SELECT = db`
+  SELECT t.*, o.kind AS order_kind, o.payload AS order_payload
+  FROM clinical.tasks t
+  JOIN clinical.orders o ON o.id = t.order_id
+`;
+
 export function listTasksByAdmission(
   admission_id: string,
   status?: Task['status']
 ): Promise<Task[]> {
   if (status) {
     return db<Task[]>`
-      SELECT * FROM clinical.tasks
-      WHERE admission_id = ${admission_id} AND status = ${status}
-      ORDER BY due_at NULLS LAST, created_at
+      ${TASK_SELECT}
+      WHERE t.admission_id = ${admission_id} AND t.status = ${status}
+      ORDER BY t.due_at NULLS LAST, t.created_at
     `;
   }
   return db<Task[]>`
-    SELECT * FROM clinical.tasks
-    WHERE admission_id = ${admission_id}
-    ORDER BY due_at NULLS LAST, created_at
+    ${TASK_SELECT}
+    WHERE t.admission_id = ${admission_id}
+    ORDER BY t.due_at NULLS LAST, t.created_at
   `;
 }
 
@@ -141,14 +150,14 @@ export function listTasksByNurse(
 ): Promise<Task[]> {
   if (status) {
     return db<Task[]>`
-      SELECT t.* FROM clinical.tasks t
+      ${TASK_SELECT}
       JOIN clinical.admissions a ON a.id = t.admission_id
       WHERE a.assigned_to = ${nurse_id} AND t.status = ${status}
       ORDER BY t.due_at NULLS LAST, t.created_at
     `;
   }
   return db<Task[]>`
-    SELECT t.* FROM clinical.tasks t
+    ${TASK_SELECT}
     JOIN clinical.admissions a ON a.id = t.admission_id
     WHERE a.assigned_to = ${nurse_id}
     ORDER BY t.due_at NULLS LAST, t.created_at

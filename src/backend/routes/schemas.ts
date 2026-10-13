@@ -153,4 +153,6 @@ export const TaskSchema = z.object({
   completed_at: z.string().nullable(),
   revision: z.number(),
   created_at: z.string(),
+  order_kind: z.enum(['medication', 'investigation', 'nursing']),
+  order_payload: z.record(z.string(), z.unknown()),
 });
