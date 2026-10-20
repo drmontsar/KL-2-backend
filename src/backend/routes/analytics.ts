@@ -36,6 +36,32 @@ const DoctorAnalyticsSchema = z.object({
     flags:        z.array(z.string()),
   })),
   pending_tasks_total: z.number().int(),
+  career: z.object({
+    total_handled:    z.number().int(),
+    total_discharged: z.number().int(),
+  }),
+  case_mix: z.array(z.object({
+    description: z.string(),
+    count:       z.number().int(),
+  })),
+  handover_stats: z.object({
+    sessions_received: z.number().int(),
+    sessions_given:    z.number().int(),
+    received_from: z.array(z.object({
+      doctor_id:   z.string().uuid(),
+      doctor_name: z.string(),
+      count:       z.number().int(),
+    })),
+    given_to: z.array(z.object({
+      doctor_id:   z.string().uuid(),
+      doctor_name: z.string(),
+      count:       z.number().int(),
+    })),
+  }),
+  transfer_stats: z.object({
+    received: z.number().int(),
+    given:    z.number().int(),
+  }),
 });
 
 export const analyticsRouter = new OpenAPIHono<{ Variables: Variables }>();
