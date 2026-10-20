@@ -49,6 +49,13 @@ const UpdateAdmissionBody = z.object({
   expected_revision: z.number().int().positive(),
   ward: z.string().optional(),
   bed: z.string().optional(),
+  severity: z.enum(['unstable', 'watcher', 'stable']).optional(),
+});
+
+const DischargeBody = z.object({
+  exit_type: z.enum(['discharged', 'transfer_team', 'transfer_out', 'lama', 'died']).optional(),
+  exit_dest: z.string().optional(),
+  exit_note: z.string().optional(),
 });
 
 const CreateDiagnosisBody = z.object({
@@ -260,7 +267,10 @@ admissionsRouter.openapi(
     method: 'post',
     path: '/{id}/discharge',
     tags: ['Admissions'],
-    request: { params: IdParam },
+    request: {
+      params: IdParam,
+      body: { content: { 'application/json': { schema: DischargeBody } }, required: false },
+    },
     responses: {
       200: {
         content: { 'application/json': { schema: AdmissionSchema } },
@@ -274,7 +284,12 @@ admissionsRouter.openapi(
   }),
   async (c) => {
     const { id } = c.req.valid('param');
-    const admission = await dischargeAdmission(id);
+    const body = await c.req.json().catch(() => ({})) as { exit_type?: string; exit_dest?: string; exit_note?: string };
+    const admission = await dischargeAdmission(id, {
+      exit_type: (body.exit_type ?? 'discharged') as Parameters<typeof dischargeAdmission>[1] extends { exit_type: infer T } ? T : never,
+      exit_dest: body.exit_dest,
+      exit_note: body.exit_note,
+    });
     if (!admission) {
       return c.json({ error: 'not found or already discharged' }, 404);
     }

@@ -7,6 +7,7 @@ import { logger } from './logger';
 import { authMiddleware } from './middleware/auth';
 import { admissionsRouter } from './routes/admissions';
 import { authRouter } from './routes/auth';
+import { contingenciesRouter } from './routes/contingencies';
 import { diagnosesRouter } from './routes/diagnoses';
 import { eventsRouter } from './routes/events';
 import { handoffsRouter } from './routes/handoffs';
@@ -14,6 +15,7 @@ import { notesRouter } from './routes/notes';
 import { notificationsRouter } from './routes/notifications';
 import { ordersRouter, tasksRouter } from './routes/orders';
 import { patientsRouter } from './routes/patients';
+import { shiftEventsRouter } from './routes/shift_events';
 import { usersRouter } from './routes/users';
 import type { User } from './db/queries/users';
 
@@ -67,6 +69,8 @@ app.route('/orders', ordersRouter);
 app.route('/tasks', tasksRouter);
 app.route('/diagnoses', diagnosesRouter);
 app.route('/handoffs', handoffsRouter);
+app.route('/admissions', contingenciesRouter);
+app.route('/admissions', shiftEventsRouter);
 app.route('/notifications', notificationsRouter);
 app.route('/events', eventsRouter);
 
