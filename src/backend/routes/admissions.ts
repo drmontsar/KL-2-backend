@@ -360,6 +360,11 @@ admissionsRouter.openapi(
     if (result === 'conflict') return c.json({ error: 'revision conflict' }, 409);
     if (result === 'bad_target') return c.json({ error: 'target doctor not found or inactive' }, 404);
     if (!result) return c.json({ error: 'admission not found or not active' }, 404);
+    await createNotification({
+      user_id: to_doctor_id,
+      type: 'transfer.received',
+      payload: { admission_id: id, from_doctor_id: user.id },
+    });
     return c.json(result, 200);
   }
 );
