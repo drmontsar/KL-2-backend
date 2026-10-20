@@ -4,7 +4,9 @@ import { cors } from 'hono/cors';
 import { routePath } from 'hono/route';
 import { config } from './config';
 import { logger } from './logger';
+import { authMiddleware } from './middleware/auth';
 import { admissionsRouter } from './routes/admissions';
+import { authRouter } from './routes/auth';
 import { diagnosesRouter } from './routes/diagnoses';
 import { eventsRouter } from './routes/events';
 import { handoffsRouter } from './routes/handoffs';
@@ -13,8 +15,11 @@ import { notificationsRouter } from './routes/notifications';
 import { ordersRouter, tasksRouter } from './routes/orders';
 import { patientsRouter } from './routes/patients';
 import { usersRouter } from './routes/users';
+import type { User } from './db/queries/users';
 
-const app = new OpenAPIHono();
+type Variables = { user: User };
+
+const app = new OpenAPIHono<{ Variables: Variables }>();
 
 app.use('*', async (c, next) => {
   const start = Date.now();
@@ -43,6 +48,16 @@ app.onError((error, c) => {
 });
 
 app.use('*', cors());
+
+// Public routes — no token required
+app.route('/auth', authRouter);
+
+// All routes below require a valid session
+const UNPROTECTED = ['/auth', '/docs', '/openapi.json'];
+app.use('*', async (c, next) => {
+  if (UNPROTECTED.some((p) => c.req.path.startsWith(p))) return next();
+  return authMiddleware(c, next);
+});
 
 app.route('/users', usersRouter);
 app.route('/patients', patientsRouter);
