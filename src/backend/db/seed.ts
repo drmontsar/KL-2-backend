@@ -9,9 +9,13 @@ import { logger } from '../logger';
 const db = postgres(config.databaseUrl);
 
 // ── Fixed user IDs (stable across re-seeds) ──────────────────────────────────
+// Demo phones: Dr. Harrington +44 7700 900321 | Dr. Patel +44 7700 900322 | Dr. Chen +44 7700 900323
+// Nurse: Sarah Mitchell +44 7700 900654
 
-const DOCTOR_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
-const NURSE_ID = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22';
+const DOCTOR_ID  = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // Dr. James Harrington
+const DOCTOR_ID2 = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'; // Dr. Priya Patel
+const DOCTOR_ID3 = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'; // Dr. Wei Chen
+const NURSE_ID   = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22';
 
 // ── Name pools ────────────────────────────────────────────────────────────────
 
@@ -358,8 +362,10 @@ await db`TRUNCATE clinical.audit_log, clinical.handoffs, clinical.vitals,
 await db`
   INSERT INTO staff.users (id, name, role, registration_number, specialization, phone)
   VALUES
-    (${DOCTOR_ID}, 'Dr. James Harrington', 'doctor', 'GMC-7842301', 'General & Internal Medicine', '+44 7700 900321'),
-    (${NURSE_ID},  'Sarah Mitchell RN',    'nurse',  'NMC-4429187', NULL, '+44 7700 900654')
+    (${DOCTOR_ID},  'Dr. James Harrington', 'doctor', 'GMC-7842301', 'General & Internal Medicine', '+44 7700 900321'),
+    (${DOCTOR_ID2}, 'Dr. Priya Patel',      'doctor', 'GMC-9134502', 'Cardiology',                  '+44 7700 900322'),
+    (${DOCTOR_ID3}, 'Dr. Wei Chen',         'doctor', 'GMC-6250873', 'Neurology',                   '+44 7700 900323'),
+    (${NURSE_ID},   'Sarah Mitchell RN',    'nurse',  'NMC-4429187', NULL,                           '+44 7700 900654')
   ON CONFLICT (id) DO UPDATE
     SET name = EXCLUDED.name,
         role = EXCLUDED.role,
@@ -406,6 +412,7 @@ const patientIds = insertedPatients.map((r) => r.id);
 logger.info(`Seeded ${patientIds.length} patients`);
 
 // 4 — 60 active admissions (patients 0-59) + 20 discharged (patients 60-79)
+// Doctor distribution: 0-19 → DOCTOR_ID (~20), 20-39 → DOCTOR_ID2 (~20), 40-49 → DOCTOR_ID3 (~10), 50-59 → open
 const admissions: {
   patient_id: string;
   status: string;
@@ -414,8 +421,16 @@ const admissions: {
   admitted_at: Date;
   discharged_at: Date | null;
   assigned_to: string | null;
+  assigned_doctor_id: string | null;
   created_by: string;
 }[] = [];
+
+function assignedDoctor(i: number): string | null {
+  if (i < 20) return DOCTOR_ID;
+  if (i < 40) return DOCTOR_ID2;
+  if (i < 50) return DOCTOR_ID3;
+  return null; // open
+}
 
 // 60 active
 for (let i = 0; i < 60; i++) {
@@ -429,6 +444,7 @@ for (let i = 0; i < 60; i++) {
     admitted_at: hoursAgo(rand(2, 72)),
     discharged_at: null,
     assigned_to: i < 30 ? NURSE_ID : null,
+    assigned_doctor_id: assignedDoctor(i),
     created_by: DOCTOR_ID,
   });
 }
@@ -446,6 +462,7 @@ for (let i = 60; i < 80; i++) {
     admitted_at: admittedAt,
     discharged_at: new Date(admittedAt.getTime() + rand(2, 6) * 86400_000),
     assigned_to: NURSE_ID,
+    assigned_doctor_id: assignedDoctor(i - 60),
     created_by: DOCTOR_ID,
   });
 }
@@ -453,7 +470,7 @@ for (let i = 60; i < 80; i++) {
 const insertedAdmissions = await db<
   { id: string; patient_id: string; ward: string; status: string }[]
 >`
-  INSERT INTO clinical.admissions ${db(admissions, 'patient_id', 'status', 'ward', 'bed', 'admitted_at', 'discharged_at', 'assigned_to', 'created_by')}
+  INSERT INTO clinical.admissions ${db(admissions, 'patient_id', 'status', 'ward', 'bed', 'admitted_at', 'discharged_at', 'assigned_to', 'assigned_doctor_id', 'created_by')}
   RETURNING id, patient_id, ward, status
 `;
 logger.info(`Seeded ${insertedAdmissions.length} admissions`);
@@ -660,4 +677,6 @@ for (let i = 0; i < assignedAdmissions.length; i++) {
 logger.info(`Seeded ${handoffCount} handoffs`);
 
 await db.end();
-logger.info(`Seeding done. Doctor ID: ${DOCTOR_ID}, Nurse ID: ${NURSE_ID}`);
+logger.info(
+  `Seeding done.\n  Dr. Harrington : ${DOCTOR_ID}  +44 7700 900321\n  Dr. Patel      : ${DOCTOR_ID2} +44 7700 900322\n  Dr. Chen       : ${DOCTOR_ID3} +44 7700 900323\n  Nurse Mitchell : ${NURSE_ID}  +44 7700 900654`
+);
