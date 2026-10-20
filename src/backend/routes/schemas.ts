@@ -11,8 +11,14 @@ export const UserSchema = z.object({
   registration_number: z.string().nullable(),
   specialization: z.string().nullable(),
   phone: z.string().nullable(),
+  current_area: z.string().nullable(),
+  last_seen_at: z.string().nullable(),
   created_at: z.string(),
   disabled_at: z.string().nullable(),
+});
+
+export const DoctorPresenceSchema = UserSchema.extend({
+  online: z.boolean(),
 });
 
 const AllergyEntrySchema = z.object({
@@ -209,6 +215,20 @@ export const HandoverSessionSchema = z.object({
 
 export const HandoverSessionDetailSchema = HandoverSessionSchema.extend({
   items: z.array(HandoverItemSchema),
+});
+
+export const TransferRequestSchema = z.object({
+  id: z.string().uuid(),
+  admission_id: z.string().uuid(),
+  from_doctor_id: z.string().uuid(),
+  to_doctor_id: z.string().uuid(),
+  status: z.enum(['pending', 'accepted', 'rejected']),
+  message: z.string().nullable(),
+  created_at: z.string(),
+  resolved_at: z.string().nullable(),
+  patient_name: z.string(),
+  ward: z.string().nullable(),
+  bed: z.string().nullable(),
 });
 
 export const TaskSchema = z.object({
