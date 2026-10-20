@@ -11,12 +11,15 @@ export type Admission = {
   admitted_at: Date;
   discharged_at: Date | null;
   assigned_to: string | null;
+  assigned_doctor_id: string | null;
   exit_type: 'discharged' | 'transfer_team' | 'transfer_out' | 'lama' | 'died' | null;
   exit_dest: string | null;
   exit_note: string | null;
   revision: number;
   created_by: string | null;
 };
+
+type UserCtx = { id: string; role: string };
 
 export async function createAdmission(data: {
   patient_id: string;
@@ -192,4 +195,120 @@ export async function updateAdmission(
     after: row,
   });
   return row;
+}
+
+// Returns admission only if the requesting user is allowed to see it:
+// doctor → their own (assigned_doctor_id = user.id) or open (NULL)
+// nurse  → assigned to them (assigned_to = user.id)
+// admin  → any
+export async function getAdmissionForUser(
+  id: string,
+  user: UserCtx
+): Promise<Admission | null> {
+  if (user.role === 'doctor') {
+    const [row] = await db<Admission[]>`
+      SELECT * FROM clinical.admissions
+      WHERE id = ${id}
+        AND (assigned_doctor_id IS NULL OR assigned_doctor_id = ${user.id})
+    `;
+    return row ?? null;
+  }
+  if (user.role === 'nurse') {
+    const [row] = await db<Admission[]>`
+      SELECT * FROM clinical.admissions
+      WHERE id = ${id} AND assigned_to = ${user.id}
+    `;
+    return row ?? null;
+  }
+  return getAdmissionById(id);
+}
+
+type ActiveAdmissionRow = Admission & { patient_name: string; patient_dob: string };
+
+const SEVERITY_ORDER = db`CASE a.severity WHEN 'unstable' THEN 0 WHEN 'watcher' THEN 1 ELSE 2 END`;
+
+// Scoped active admission list — scope drives doctor/nurse filtering
+export function listAdmissionsForUser(
+  user: UserCtx,
+  opts?: { scope?: 'mine' | 'open'; ward?: string }
+): Promise<ActiveAdmissionRow[]> {
+  const { scope, ward } = opts ?? {};
+  const base = db`
+    SELECT a.*, p.name AS patient_name, p.dob AS patient_dob
+    FROM clinical.admissions a
+    JOIN clinical.patients p ON p.id = a.patient_id
+    WHERE a.status = 'active'
+  `;
+
+  if (user.role === 'doctor' && scope === 'mine') {
+    if (ward) {
+      return db<ActiveAdmissionRow[]>`
+        ${base} AND a.assigned_doctor_id = ${user.id} AND a.ward = ${ward}
+        ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at
+      `;
+    }
+    return db<ActiveAdmissionRow[]>`
+      ${base} AND a.assigned_doctor_id = ${user.id}
+      ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at
+    `;
+  }
+
+  if (scope === 'open') {
+    if (ward) {
+      return db<ActiveAdmissionRow[]>`
+        ${base} AND a.assigned_doctor_id IS NULL AND a.ward = ${ward}
+        ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at
+      `;
+    }
+    return db<ActiveAdmissionRow[]>`
+      ${base} AND a.assigned_doctor_id IS NULL
+      ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at
+    `;
+  }
+
+  // nurse scope: their assigned admissions
+  if (user.role === 'nurse') {
+    if (ward) {
+      return db<ActiveAdmissionRow[]>`
+        ${base} AND a.assigned_to = ${user.id} AND a.ward = ${ward}
+        ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at
+      `;
+    }
+    return db<ActiveAdmissionRow[]>`
+      ${base} AND a.assigned_to = ${user.id}
+      ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at
+    `;
+  }
+
+  // admin / no scope — full list (legacy behaviour)
+  return listActiveAdmissions(ward ? { ward } : undefined);
+}
+
+// Atomic claim: sets assigned_doctor_id only if currently NULL
+export async function claimAdmission(
+  id: string,
+  doctor_id: string
+): Promise<Admission | null | 'already_claimed'> {
+  const [row] = await db<Admission[]>`
+    UPDATE clinical.admissions
+    SET assigned_doctor_id = ${doctor_id}, revision = revision + 1
+    WHERE id = ${id} AND status = 'active' AND assigned_doctor_id IS NULL
+    RETURNING *
+  `;
+  if (row) {
+    await auditLog({
+      action: 'claim',
+      record_table: 'clinical.admissions',
+      record_id: id,
+      actor_user_id: doctor_id,
+      after: row,
+    });
+    return row;
+  }
+  const [exists] = await db`
+    SELECT assigned_doctor_id FROM clinical.admissions
+    WHERE id = ${id} AND status = 'active'
+  `;
+  if (!exists) return null;
+  return exists.assigned_doctor_id ? 'already_claimed' : null;
 }

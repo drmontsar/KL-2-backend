@@ -1,14 +1,19 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from 'zod';
+import type { User } from '../db/queries/users';
 import {
   assignAdmission,
+  claimAdmission,
   createAdmission,
   dischargeAdmission,
   getAdmissionById,
-  listActiveAdmissions,
+  getAdmissionForUser,
+  listAdmissionsForUser,
   unassignAdmission,
   updateAdmission,
 } from '../db/queries/admissions';
+
+type Variables = { user: User };
 import { createHandoff } from '../db/queries/handoffs';
 import { createNotification } from '../db/queries/notifications';
 import { listVitalsByAdmission, recordVitals } from '../db/queries/vitals';
@@ -79,6 +84,7 @@ const CreateOrderBody = z.object({
 const ListQuery = z.object({
   ward: z.string().optional(),
   assigned_to: z.string().uuid().optional(),
+  scope: z.enum(['mine', 'open']).optional(),
 });
 
 const OrderStatusQuery = z.object({
@@ -89,7 +95,7 @@ const TaskStatusQuery = z.object({
   status: z.enum(['pending', 'done', 'cancelled']).optional(),
 });
 
-export const admissionsRouter = new OpenAPIHono();
+export const admissionsRouter = new OpenAPIHono<{ Variables: Variables }>();
 
 admissionsRouter.openapi(
   createRoute({
@@ -107,8 +113,9 @@ admissionsRouter.openapi(
     },
   }),
   async (c) => {
-    const { ward, assigned_to } = c.req.valid('query');
-    const admissions = await listActiveAdmissions({ ward, assigned_to });
+    const { ward, scope } = c.req.valid('query');
+    const user = c.get('user');
+    const admissions = await listAdmissionsForUser(user, { scope, ward });
     return c.json(admissions, 200);
   }
 );
@@ -148,17 +155,18 @@ admissionsRouter.openapi(
         content: { 'application/json': { schema: AdmissionSchema } },
         description: 'Admission found',
       },
-      404: {
+      403: {
         content: { 'application/json': { schema: ErrorSchema } },
-        description: 'Not found',
+        description: 'Not found or access denied',
       },
     },
   }),
   async (c) => {
     const { id } = c.req.valid('param');
-    const admission = await getAdmissionById(id);
+    const user = c.get('user');
+    const admission = await getAdmissionForUser(id, user);
     if (!admission) {
-      return c.json({ error: 'not found' }, 404);
+      return c.json({ error: 'not found or forbidden' }, 403);
     }
     return c.json(admission, 200);
   }
@@ -180,6 +188,10 @@ admissionsRouter.openapi(
         content: { 'application/json': { schema: AdmissionSchema } },
         description: 'Admission updated',
       },
+      403: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Not found or access denied',
+      },
       404: {
         content: { 'application/json': { schema: ErrorSchema } },
         description: 'Not found or already discharged',
@@ -192,6 +204,9 @@ admissionsRouter.openapi(
   }),
   async (c) => {
     const { id } = c.req.valid('param');
+    const user = c.get('user');
+    const check = await getAdmissionForUser(id, user);
+    if (!check) return c.json({ error: 'not found or forbidden' }, 403);
     const { expected_revision, ...data } = c.req.valid('json');
     const result = await updateAdmission(id, data, expected_revision);
     if (result === 'conflict') {
@@ -265,6 +280,44 @@ admissionsRouter.openapi(
 admissionsRouter.openapi(
   createRoute({
     method: 'post',
+    path: '/{id}/claim',
+    tags: ['Admissions'],
+    request: { params: IdParam },
+    responses: {
+      200: {
+        content: { 'application/json': { schema: AdmissionSchema } },
+        description: 'Claimed — you are now the assigned doctor',
+      },
+      403: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Nurses cannot claim admissions',
+      },
+      404: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Admission not found or not active',
+      },
+      409: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Already claimed by another doctor',
+      },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const user = c.get('user');
+    if (user.role !== 'doctor') {
+      return c.json({ error: 'only doctors can claim admissions' }, 403);
+    }
+    const result = await claimAdmission(id, user.id);
+    if (result === 'already_claimed') return c.json({ error: 'already claimed by another doctor' }, 409);
+    if (!result) return c.json({ error: 'not found or not active' }, 404);
+    return c.json(result, 200);
+  }
+);
+
+admissionsRouter.openapi(
+  createRoute({
+    method: 'post',
     path: '/{id}/discharge',
     tags: ['Admissions'],
     request: {
@@ -276,6 +329,10 @@ admissionsRouter.openapi(
         content: { 'application/json': { schema: AdmissionSchema } },
         description: 'Discharged',
       },
+      403: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Not found or access denied',
+      },
       404: {
         content: { 'application/json': { schema: ErrorSchema } },
         description: 'Not found or already discharged',
@@ -284,6 +341,9 @@ admissionsRouter.openapi(
   }),
   async (c) => {
     const { id } = c.req.valid('param');
+    const user = c.get('user');
+    const check = await getAdmissionForUser(id, user);
+    if (!check) return c.json({ error: 'not found or forbidden' }, 403);
     const body = await c.req.json().catch(() => ({})) as { exit_type?: string; exit_dest?: string; exit_note?: string };
     const admission = await dischargeAdmission(id, {
       exit_type: (body.exit_type ?? 'discharged') as Parameters<typeof dischargeAdmission>[1] extends { exit_type: infer T } ? T : never,

@@ -46,6 +46,7 @@ export const AdmissionSchema = z.object({
   admitted_at: z.string(),
   discharged_at: z.string().nullable(),
   assigned_to: z.string().uuid().nullable(),
+  assigned_doctor_id: z.string().uuid().nullable(),
   exit_type: z.enum(['discharged', 'transfer_team', 'transfer_out', 'lama', 'died']).nullable(),
   exit_dest: z.string().nullable(),
   exit_note: z.string().nullable(),
