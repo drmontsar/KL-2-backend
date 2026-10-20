@@ -165,6 +165,52 @@ export const HandoffSchema = z.object({
   done_at: z.string().nullable(),
 });
 
+const HandoverSnapshotSchema = z.object({
+  patient_name: z.string(),
+  patient_dob: z.string(),
+  ward: z.string().nullable(),
+  bed: z.string().nullable(),
+  severity: z.enum(['unstable', 'watcher', 'stable']),
+  diagnoses: z.array(z.string()),
+  contingencies: z.array(z.string()),
+  shift_events: z.array(z.object({ body: z.string(), logged_at: z.string() })),
+  latest_note: z.string().nullable(),
+});
+
+export const HandoverAcknowledgmentSchema = z.object({
+  id: z.string().uuid(),
+  item_id: z.string().uuid(),
+  item_version: z.number().int(),
+  acknowledged_by: z.string().uuid(),
+  notes: z.string().nullable(),
+  acknowledged_at: z.string(),
+});
+
+export const HandoverItemSchema = z.object({
+  id: z.string().uuid(),
+  session_id: z.string().uuid(),
+  admission_id: z.string().uuid(),
+  snapshot: HandoverSnapshotSchema,
+  item_version: z.number().int(),
+  created_at: z.string(),
+  acknowledgment: HandoverAcknowledgmentSchema.nullable(),
+  stale: z.boolean(),
+});
+
+export const HandoverSessionSchema = z.object({
+  id: z.string().uuid(),
+  outgoing_doctor_id: z.string().uuid(),
+  incoming_doctor_id: z.string().uuid(),
+  ward: z.string().nullable(),
+  status: z.enum(['active', 'completed']),
+  created_at: z.string(),
+  completed_at: z.string().nullable(),
+});
+
+export const HandoverSessionDetailSchema = HandoverSessionSchema.extend({
+  items: z.array(HandoverItemSchema),
+});
+
 export const TaskSchema = z.object({
   id: z.string().uuid(),
   order_id: z.string().uuid(),
