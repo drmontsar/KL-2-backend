@@ -37,10 +37,10 @@ export async function createTransferRequest(data: {
     FROM clinical.admissions a
     JOIN clinical.patients p ON p.id = a.patient_id
     WHERE a.id = ${data.admission_id} AND a.status = 'active'
+      AND a.assigned_doctor_id = ${data.from_doctor_id}
   `;
   if (!adm) return 'not_owner';
-  if (adm.assigned_doctor_id !== data.from_doctor_id) return 'not_owner';
-  if (adm.revision !== data.expected_revision) return 'conflict';
+  if (Number(adm.revision) !== data.expected_revision) return 'conflict';
 
   const [req] = await db<TransferRequest[]>`
     INSERT INTO clinical.transfer_requests
