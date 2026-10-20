@@ -7,6 +7,7 @@ export type Handoff = {
   requested_by: string;
   assigned_to: string;
   reason: string | null;
+  readback: string | null;
   status: 'pending' | 'acknowledged' | 'done';
   requested_at: Date;
   acknowledged_at: Date | null;
@@ -55,14 +56,16 @@ export function listHandoffs(opts: {
 
 export async function acknowledgeHandoff(
   id: string,
-  acknowledged_by: string
+  acknowledged_by: string,
+  readback?: string
 ): Promise<Handoff | null> {
   const [row] = await db<Handoff[]>`
     UPDATE clinical.handoffs
     SET
       status          = 'acknowledged',
       acknowledged_by = ${acknowledged_by},
-      acknowledged_at = now()
+      acknowledged_at = now(),
+      readback        = ${readback ?? null}
     WHERE id = ${id} AND status = 'pending'
     RETURNING *
   `;

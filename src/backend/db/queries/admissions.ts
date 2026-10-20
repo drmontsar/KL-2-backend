@@ -5,11 +5,15 @@ export type Admission = {
   id: string;
   patient_id: string;
   status: 'active' | 'discharged';
+  severity: 'unstable' | 'watcher' | 'stable';
   ward: string | null;
   bed: string | null;
   admitted_at: Date;
   discharged_at: Date | null;
   assigned_to: string | null;
+  exit_type: 'discharged' | 'transfer_team' | 'transfer_out' | 'lama' | 'died' | null;
+  exit_dest: string | null;
+  exit_note: string | null;
   revision: number;
   created_by: string | null;
 };
@@ -79,7 +83,9 @@ export function listActiveAdmissions(opts?: {
     FROM clinical.admissions a
     JOIN clinical.patients p ON p.id = a.patient_id
     WHERE a.status = 'active'
-    ORDER BY a.ward, a.admitted_at
+    ORDER BY a.ward,
+             CASE a.severity WHEN 'unstable' THEN 0 WHEN 'watcher' THEN 1 ELSE 2 END,
+             a.admitted_at
   `;
 }
 
@@ -94,11 +100,17 @@ export function listAdmissionsByPatient(
 }
 
 export async function dischargeAdmission(
-  id: string
+  id: string,
+  exit?: { exit_type: Admission['exit_type']; exit_dest?: string; exit_note?: string }
 ): Promise<Admission | null> {
   const [row] = await db<Admission[]>`
     UPDATE clinical.admissions
-    SET status = 'discharged', discharged_at = now(), revision = revision + 1
+    SET status        = 'discharged',
+        discharged_at = now(),
+        exit_type     = ${exit?.exit_type ?? 'discharged'},
+        exit_dest     = ${exit?.exit_dest ?? null},
+        exit_note     = ${exit?.exit_note ?? null},
+        revision      = revision + 1
     WHERE id = ${id} AND status = 'active'
     RETURNING *
   `;
@@ -155,7 +167,7 @@ export async function unassignAdmission(id: string): Promise<Admission | null> {
 
 export async function updateAdmission(
   id: string,
-  data: { ward?: string; bed?: string },
+  data: { ward?: string; bed?: string; severity?: Admission['severity'] },
   expected_revision: number
 ): Promise<Admission | null | 'conflict'> {
   const [row] = await db<Admission[]>`
@@ -163,6 +175,7 @@ export async function updateAdmission(
     SET
       ward     = COALESCE(${data.ward ?? null}, ward),
       bed      = COALESCE(${data.bed ?? null}, bed),
+      severity = COALESCE(${data.severity ?? null}, severity),
       revision = revision + 1
     WHERE id = ${id} AND status = 'active' AND revision = ${expected_revision}
     RETURNING *

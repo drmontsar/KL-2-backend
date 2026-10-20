@@ -40,13 +40,33 @@ export const AdmissionSchema = z.object({
   id: z.string().uuid(),
   patient_id: z.string().uuid(),
   status: z.enum(['active', 'discharged']),
+  severity: z.enum(['unstable', 'watcher', 'stable']),
   ward: z.string().nullable(),
   bed: z.string().nullable(),
   admitted_at: z.string(),
   discharged_at: z.string().nullable(),
   assigned_to: z.string().uuid().nullable(),
+  exit_type: z.enum(['discharged', 'transfer_team', 'transfer_out', 'lama', 'died']).nullable(),
+  exit_dest: z.string().nullable(),
+  exit_note: z.string().nullable(),
   revision: z.number(),
   created_by: z.string().nullable(),
+});
+
+export const ContingencySchema = z.object({
+  id: z.string().uuid(),
+  admission_id: z.string().uuid(),
+  body: z.string(),
+  created_by: z.string().uuid(),
+  created_at: z.string(),
+});
+
+export const ShiftEventSchema = z.object({
+  id: z.string().uuid(),
+  admission_id: z.string().uuid(),
+  body: z.string(),
+  logged_by: z.string().uuid(),
+  logged_at: z.string(),
 });
 
 export const ActiveAdmissionSchema = AdmissionSchema.extend({
@@ -136,6 +156,7 @@ export const HandoffSchema = z.object({
   requested_by: z.string().uuid(),
   assigned_to: z.string().uuid(),
   reason: z.string().nullable(),
+  readback: z.string().nullable(),
   status: z.enum(['pending', 'acknowledged', 'done']),
   requested_at: z.string(),
   acknowledged_at: z.string().nullable(),

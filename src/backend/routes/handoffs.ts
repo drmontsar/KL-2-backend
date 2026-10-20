@@ -13,7 +13,10 @@ const ListHandoffsQuery = z.object({
   status: z.enum(['pending', 'acknowledged', 'done']).optional(),
 });
 
-const AcknowledgeBody = z.object({ acknowledged_by: z.string().uuid() });
+const AcknowledgeBody = z.object({
+  acknowledged_by: z.string().uuid(),
+  readback: z.string().optional(),
+});
 
 export const handoffsRouter = new OpenAPIHono();
 
@@ -59,8 +62,8 @@ handoffsRouter.openapi(
   }),
   async (c) => {
     const { id } = c.req.valid('param');
-    const { acknowledged_by } = c.req.valid('json');
-    const handoff = await acknowledgeHandoff(id, acknowledged_by);
+    const { acknowledged_by, readback } = c.req.valid('json');
+    const handoff = await acknowledgeHandoff(id, acknowledged_by, readback);
     if (!handoff) {
       return c.json({ error: 'not found or not pending' }, 404);
     }
