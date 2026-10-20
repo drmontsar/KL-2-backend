@@ -9,10 +9,10 @@ import {
   getAdmissionById,
   getAdmissionForUser,
   listAdmissionsForUser,
-  transferAdmission,
   unassignAdmission,
   updateAdmission,
 } from '../db/queries/admissions';
+import { createTransferRequest } from '../db/queries/transfer_requests';
 
 type Variables = { user: User };
 import { createHandoff } from '../db/queries/handoffs';
@@ -39,6 +39,7 @@ import {
   NoteSchema,
   OrderSchema,
   TaskSchema,
+  TransferRequestSchema,
   VitalsSchema,
 } from './schemas';
 
@@ -319,6 +320,7 @@ admissionsRouter.openapi(
 const TransferDoctorBody = z.object({
   to_doctor_id: z.string().uuid(),
   expected_revision: z.number().int().positive(),
+  message: z.string().optional(),
 });
 
 admissionsRouter.openapi(
@@ -331,9 +333,9 @@ admissionsRouter.openapi(
       body: { content: { 'application/json': { schema: TransferDoctorBody } } },
     },
     responses: {
-      200: {
-        content: { 'application/json': { schema: AdmissionSchema } },
-        description: 'Transferred — admission now belongs to the target doctor',
+      201: {
+        content: { 'application/json': { schema: TransferRequestSchema } },
+        description: 'Transfer request created — pending Doctor B acceptance',
       },
       403: {
         content: { 'application/json': { schema: ErrorSchema } },
@@ -353,19 +355,31 @@ admissionsRouter.openapi(
     const { id } = c.req.valid('param');
     const user = c.get('user');
     if (user.role !== 'doctor') return c.json({ error: 'only doctors can transfer admissions' }, 403);
-    const { to_doctor_id, expected_revision } = c.req.valid('json');
+    const { to_doctor_id, expected_revision, message } = c.req.valid('json');
     if (to_doctor_id === user.id) return c.json({ error: 'cannot transfer to yourself' }, 409);
-    const result = await transferAdmission(id, user.id, to_doctor_id, expected_revision);
+    const result = await createTransferRequest({
+      admission_id: id,
+      from_doctor_id: user.id,
+      to_doctor_id,
+      expected_revision,
+      message,
+    });
     if (result === 'not_owner') return c.json({ error: 'not your patient' }, 403);
     if (result === 'conflict') return c.json({ error: 'revision conflict' }, 409);
     if (result === 'bad_target') return c.json({ error: 'target doctor not found or inactive' }, 404);
-    if (!result) return c.json({ error: 'admission not found or not active' }, 404);
     await createNotification({
       user_id: to_doctor_id,
-      type: 'transfer.received',
-      payload: { admission_id: id, from_doctor_id: user.id },
+      type: 'transfer.requested',
+      payload: {
+        request_id: result.id,
+        admission_id: id,
+        from_doctor_id: user.id,
+        patient_name: result.patient_name,
+        ward: result.ward,
+        bed: result.bed,
+      },
     });
-    return c.json(result, 200);
+    return c.json(result, 201);
   }
 );
 

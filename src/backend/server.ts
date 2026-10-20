@@ -18,6 +18,7 @@ import { patientsRouter } from './routes/patients';
 import { shiftEventsRouter } from './routes/shift_events';
 import { handoverSessionsRouter } from './routes/handover_sessions';
 import { analyticsRouter } from './routes/analytics';
+import { transferRequestsRouter } from './routes/transfer_requests';
 import { usersRouter } from './routes/users';
 import type { User } from './db/queries/users';
 
@@ -76,6 +77,7 @@ app.route('/admissions', shiftEventsRouter);
 app.route('/notifications', notificationsRouter);
 app.route('/handover-sessions', handoverSessionsRouter);
 app.route('/analytics', analyticsRouter);
+app.route('/transfer-requests', transferRequestsRouter);
 app.route('/events', eventsRouter);
 
 app.doc('/openapi.json', {

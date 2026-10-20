@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import { resolveSession } from '../db/queries/auth';
+import { touchLastSeen } from '../db/queries/users';
 
 export async function authMiddleware(c: Context, next: Next) {
   const header = c.req.header('Authorization');
@@ -11,5 +12,6 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   c.set('user', user);
+  touchLastSeen(user.id);
   await next();
 }

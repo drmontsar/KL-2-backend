@@ -5,8 +5,13 @@ import {
   disableUser,
   getUserById,
   listUsers,
+  setDoctorArea,
+  listActiveDoctors,
 } from '../db/queries/users';
-import { ErrorSchema, IdParam, UserSchema } from './schemas';
+import type { User } from '../db/queries/users';
+import { DoctorPresenceSchema, ErrorSchema, IdParam, UserSchema } from './schemas';
+
+type Variables = { user: User };
 
 const CreateUserBody = z.object({
   name: z.string(),
@@ -16,7 +21,11 @@ const CreateUserBody = z.object({
   phone: z.string().optional(),
 });
 
-export const usersRouter = new OpenAPIHono();
+const SetAreaBody = z.object({
+  area: z.string().max(50).nullable(),
+});
+
+export const usersRouter = new OpenAPIHono<{ Variables: Variables }>();
 
 usersRouter.openapi(
   createRoute({
@@ -105,5 +114,51 @@ usersRouter.openapi(
     const { id } = c.req.valid('param');
     await disableUser(id);
     return c.body(null, 204);
+  }
+);
+
+usersRouter.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/me/area',
+    tags: ['Users'],
+    request: {
+      body: { content: { 'application/json': { schema: SetAreaBody } } },
+    },
+    responses: {
+      200: {
+        content: { 'application/json': { schema: UserSchema } },
+        description: 'Area updated',
+      },
+      403: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Only doctors can set area',
+      },
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    if (user.role !== 'doctor') return c.json({ error: 'only doctors can set area' }, 403);
+    const { area } = c.req.valid('json');
+    const updated = await setDoctorArea(user.id, area);
+    return c.json(updated!, 200);
+  }
+);
+
+usersRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/doctors/active',
+    tags: ['Users'],
+    responses: {
+      200: {
+        content: { 'application/json': { schema: z.array(DoctorPresenceSchema) } },
+        description: 'Doctors currently on shift with online status',
+      },
+    },
+  }),
+  async (c) => {
+    const doctors = await listActiveDoctors();
+    return c.json(doctors, 200);
   }
 );
