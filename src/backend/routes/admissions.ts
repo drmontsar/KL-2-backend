@@ -9,6 +9,7 @@ import {
   getAdmissionById,
   getAdmissionForUser,
   listAdmissionsForUser,
+  transferAdmission,
   unassignAdmission,
   updateAdmission,
 } from '../db/queries/admissions';
@@ -311,6 +312,54 @@ admissionsRouter.openapi(
     const result = await claimAdmission(id, user.id);
     if (result === 'already_claimed') return c.json({ error: 'already claimed by another doctor' }, 409);
     if (!result) return c.json({ error: 'not found or not active' }, 404);
+    return c.json(result, 200);
+  }
+);
+
+const TransferDoctorBody = z.object({
+  to_doctor_id: z.string().uuid(),
+  expected_revision: z.number().int().positive(),
+});
+
+admissionsRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/{id}/transfer-doctor',
+    tags: ['Admissions'],
+    request: {
+      params: IdParam,
+      body: { content: { 'application/json': { schema: TransferDoctorBody } } },
+    },
+    responses: {
+      200: {
+        content: { 'application/json': { schema: AdmissionSchema } },
+        description: 'Transferred — admission now belongs to the target doctor',
+      },
+      403: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Not your patient or not a doctor',
+      },
+      404: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Admission or target doctor not found',
+      },
+      409: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Revision conflict — re-fetch and retry',
+      },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const user = c.get('user');
+    if (user.role !== 'doctor') return c.json({ error: 'only doctors can transfer admissions' }, 403);
+    const { to_doctor_id, expected_revision } = c.req.valid('json');
+    if (to_doctor_id === user.id) return c.json({ error: 'cannot transfer to yourself' }, 409);
+    const result = await transferAdmission(id, user.id, to_doctor_id, expected_revision);
+    if (result === 'not_owner') return c.json({ error: 'not your patient' }, 403);
+    if (result === 'conflict') return c.json({ error: 'revision conflict' }, 409);
+    if (result === 'bad_target') return c.json({ error: 'target doctor not found or inactive' }, 404);
+    if (!result) return c.json({ error: 'admission not found or not active' }, 404);
     return c.json(result, 200);
   }
 );

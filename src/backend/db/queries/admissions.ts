@@ -284,6 +284,50 @@ export function listAdmissionsForUser(
   return listActiveAdmissions(ward ? { ward } : undefined);
 }
 
+// Transfer: moves admission from current doctor to another, respecting revision
+// Returns 'not_owner' if the admission isn't assigned to from_doctor_id
+// Returns 'conflict'  if the revision doesn't match
+// Returns 'bad_target' if to_doctor_id isn't an active doctor
+export async function transferAdmission(
+  id: string,
+  from_doctor_id: string,
+  to_doctor_id: string,
+  expected_revision: number
+): Promise<Admission | null | 'not_owner' | 'conflict' | 'bad_target'> {
+  const [target] = await db`
+    SELECT id FROM staff.users
+    WHERE id = ${to_doctor_id} AND role = 'doctor' AND disabled_at IS NULL
+  `;
+  if (!target) return 'bad_target';
+
+  const [row] = await db<Admission[]>`
+    UPDATE clinical.admissions
+    SET assigned_doctor_id = ${to_doctor_id}, revision = revision + 1
+    WHERE id = ${id}
+      AND status = 'active'
+      AND assigned_doctor_id = ${from_doctor_id}
+      AND revision = ${expected_revision}
+    RETURNING *
+  `;
+  if (row) {
+    await auditLog({
+      action: 'transfer',
+      record_table: 'clinical.admissions',
+      record_id: id,
+      actor_user_id: from_doctor_id,
+      after: row,
+    });
+    return row;
+  }
+  const [adm] = await db`
+    SELECT assigned_doctor_id, revision FROM clinical.admissions
+    WHERE id = ${id} AND status = 'active'
+  `;
+  if (!adm) return null;
+  if (adm.assigned_doctor_id !== from_doctor_id) return 'not_owner';
+  return 'conflict';
+}
+
 // Atomic claim: sets assigned_doctor_id only if currently NULL
 export async function claimAdmission(
   id: string,
