@@ -1,7 +1,27 @@
-import { existsSync } from 'node:fs';
-import { loadEnvFile } from 'node:process';
+import { existsSync, readFileSync } from 'node:fs';
 
-if (existsSync('.env')) loadEnvFile();
+function loadEnvFile(fileName = '.env') {
+  if (!existsSync(fileName)) return;
+
+  for (const line of readFileSync(fileName, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!match) continue;
+
+    const [, key, rawValue] = match;
+    const value = rawValue.trim();
+    const unwrapped =
+      (value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))
+        ? value.slice(1, -1)
+        : value;
+
+    if (!process.env[key]) process.env[key] = unwrapped;
+  }
+}
+
+loadEnvFile();
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is not set');
