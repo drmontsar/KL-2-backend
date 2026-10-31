@@ -1,0 +1,265 @@
+import {
+  CreateBodyInput,
+  Item,
+  ItemBodyInput,
+  Question,
+  QuestionBodyInput,
+  Session,
+} from '../../contracts/ipass';
+import { rethrowDatabaseError } from '../errors';
+import { db } from '../index';
+import { notifChannel } from './notifications';
+
+type Json = Parameters<(typeof db)['json']>[0];
+
+export async function createIpassSession(body: CreateBodyInput, actor_user_id: string) {
+  return db
+    .begin(async (tx) => {
+      const [incoming] =
+        await tx`SELECT id FROM staff.users WHERE id = ${body.incoming_doctor_id} AND role = 'doctor' AND disabled_at IS NULL`;
+      if (!incoming) return null;
+      const admissions = await tx<{ id: string }[]>`
+        SELECT id FROM clinical.admissions WHERE assigned_doctor_id = ${actor_user_id} AND status = 'active'
+          AND (${body.ward ?? null}::text IS NULL OR ward = ${body.ward ?? null}::text) ORDER BY id FOR UPDATE
+      `;
+      if (!admissions.length) return null;
+      const [session] = await tx<
+        Session[]
+      >`INSERT INTO clinical.ipass_sessions (outgoing_doctor_id, incoming_doctor_id) VALUES (${actor_user_id}, ${body.incoming_doctor_id}) RETURNING *`;
+      const ids = admissions.map((row) => row.id);
+      const items = await tx<Item[]>`
+        INSERT INTO clinical.ipass_items (session_id, admission_id, patient_name, ward, bed, severity, snapshot_revision)
+        SELECT ${session.id}, a.id, p.name, a.ward, a.bed, a.severity, a.revision
+        FROM clinical.admissions a JOIN clinical.patients p ON p.id = a.patient_id WHERE a.id IN ${tx(ids)} RETURNING *
+      `;
+      await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'create', 'clinical.ipass_sessions', ${session.id}, ${tx.json({ item_count: items.length })})`;
+      return { session, items };
+    })
+    .catch(rethrowDatabaseError);
+}
+
+export async function listIpassSessions(actor_user_id: string) {
+  return db<
+    Session[]
+  >`SELECT * FROM clinical.ipass_sessions WHERE outgoing_doctor_id = ${actor_user_id} OR incoming_doctor_id = ${actor_user_id} ORDER BY created_at DESC LIMIT 100`.catch(
+    rethrowDatabaseError,
+  );
+}
+
+export async function getIpassSession(id: string, actor_user_id: string) {
+  return db<
+    Session[]
+  >`SELECT * FROM clinical.ipass_sessions WHERE id = ${id} AND (outgoing_doctor_id = ${actor_user_id} OR (incoming_doctor_id = ${actor_user_id} AND status IN ('sent','completed')))`.catch(
+    rethrowDatabaseError,
+  );
+}
+
+export async function listIpassItems(id: string) {
+  return db<
+    Item[]
+  >`SELECT * FROM clinical.ipass_items WHERE session_id = ${id} ORDER BY CASE severity WHEN 'unstable' THEN 0 WHEN 'watcher' THEN 1 ELSE 2 END, patient_name`.catch(
+    rethrowDatabaseError,
+  );
+}
+
+export async function getOutgoingIpassItemOwner(id: string) {
+  return db<
+    { outgoing_doctor_id: string }[]
+  >`SELECT s.outgoing_doctor_id FROM clinical.ipass_sessions s JOIN clinical.ipass_items i ON i.session_id = s.id WHERE i.id = ${id}`.catch(
+    rethrowDatabaseError,
+  );
+}
+
+export async function updateIpassItem(body: ItemBodyInput, id: string, actor_user_id: string) {
+  return db
+    .begin(async (tx) => {
+      const [item] = await tx<Item[]>`
+      UPDATE clinical.ipass_items i SET patient_summary = ${body.patient_summary}, action_list = ${body.action_list}, contingency = ${body.contingency},
+        severity = a.severity, snapshot_revision = a.revision, ward = a.ward, bed = a.bed, status = 'draft', signed_at = NULL
+      FROM clinical.ipass_sessions s, clinical.admissions a
+      WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'draft' AND s.outgoing_doctor_id = ${actor_user_id}
+        AND a.id = i.admission_id AND a.status = 'active' AND a.assigned_doctor_id = ${actor_user_id} RETURNING i.*
+    `;
+      if (item)
+        await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'update', 'clinical.ipass_items', ${id}, ${tx.json(item as unknown as Json)})`;
+      return item;
+    })
+    .catch(rethrowDatabaseError);
+}
+
+export async function signIpassItem(id: string, actor_user_id: string) {
+  return db
+    .begin(async (tx) => {
+      const [item] = await tx<Item[]>`
+      UPDATE clinical.ipass_items i SET status = 'signed', signed_at = now()
+      FROM clinical.ipass_sessions s, clinical.admissions a
+      WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'draft' AND s.outgoing_doctor_id = ${actor_user_id}
+        AND i.status = 'draft' AND a.id = i.admission_id AND a.status = 'active' AND a.assigned_doctor_id = ${actor_user_id}
+        AND a.revision = i.snapshot_revision AND length(trim(i.patient_summary)) > 0 AND length(trim(i.action_list)) > 0 AND length(trim(i.contingency)) > 0 RETURNING i.*
+    `;
+      if (item)
+        await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'sign', 'clinical.ipass_items', ${id}, ${tx.json(item as unknown as Json)})`;
+      return item;
+    })
+    .catch(rethrowDatabaseError);
+}
+
+export async function getIpassSessionById(id: string) {
+  return db<Session[]>`SELECT * FROM clinical.ipass_sessions WHERE id = ${id}`.catch(
+    rethrowDatabaseError,
+  );
+}
+
+export async function sendIpassSession(id: string, actor_user_id: string) {
+  return db
+    .begin(async (tx) => {
+      const [session] = await tx<
+        Session[]
+      >`SELECT * FROM clinical.ipass_sessions WHERE id = ${id} AND status = 'draft' FOR UPDATE`;
+      if (!session) return null;
+      const [invalid] = await tx`
+      SELECT i.id FROM clinical.ipass_items i JOIN clinical.admissions a ON a.id = i.admission_id
+      WHERE i.session_id = ${id} AND (i.status <> 'signed' OR a.status <> 'active' OR a.assigned_doctor_id IS DISTINCT FROM ${actor_user_id}::uuid OR a.revision <> i.snapshot_revision)
+      LIMIT 1
+    `;
+      if (invalid) return null;
+      const [row] = await tx<
+        Session[]
+      >`UPDATE clinical.ipass_sessions SET status = 'sent', sent_at = now() WHERE id = ${id} RETURNING *`;
+      await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'send', 'clinical.ipass_sessions', ${id}, ${tx.json(row as unknown as Json)})`;
+      const [notification] = await tx<
+        { id: string; type: string; payload: Json; created_at: Date }[]
+      >`INSERT INTO clinical.notifications (user_id, type, payload) VALUES (${row.incoming_doctor_id}, 'ipass.sent', ${tx.json({ session_id: id })}) RETURNING *`;
+      await tx`SELECT pg_notify(${notifChannel(row.incoming_doctor_id)}, ${JSON.stringify(notification)})`;
+      return row;
+    })
+    .catch(rethrowDatabaseError);
+}
+
+export async function getIncomingIpassItemOwner(id: string) {
+  return db<
+    { incoming_doctor_id: string }[]
+  >`SELECT s.incoming_doctor_id FROM clinical.ipass_sessions s JOIN clinical.ipass_items i ON i.session_id = s.id WHERE i.id = ${id}`.catch(
+    rethrowDatabaseError,
+  );
+}
+
+export async function acceptIpassItem(
+  id: string,
+  actor_user_id: string,
+  readback: string | undefined,
+) {
+  return db
+    .begin(async (tx) => {
+      const [item] = await tx<(Item & { outgoing_doctor_id: string })[]>`
+      SELECT i.*, s.outgoing_doctor_id FROM clinical.ipass_items i JOIN clinical.ipass_sessions s ON s.id = i.session_id
+      WHERE i.id = ${id} AND s.incoming_doctor_id = ${actor_user_id} AND s.status = 'sent' AND i.status = 'signed' FOR UPDATE OF i, s
+    `;
+      if (!item || (item.severity !== 'stable' && !readback)) return null;
+      const [admission] = await tx<{ id: string }[]>`
+      UPDATE clinical.admissions SET assigned_doctor_id = ${actor_user_id}, revision = revision + 1
+      WHERE id = ${item.admission_id} AND status = 'active' AND assigned_doctor_id = ${item.outgoing_doctor_id}
+        AND revision = ${item.snapshot_revision}
+        AND NOT EXISTS (SELECT 1 FROM clinical.vitals v WHERE v.admission_id = ${item.admission_id} AND v.recorded_at > ${item.signed_at}::timestamptz)
+        AND NOT EXISTS (SELECT 1 FROM clinical.notes n WHERE n.admission_id = ${item.admission_id} AND n.created_at > ${item.signed_at}::timestamptz)
+        AND NOT EXISTS (SELECT 1 FROM clinical.orders o WHERE o.admission_id = ${item.admission_id} AND (o.created_at > ${item.signed_at}::timestamptz OR o.confirmed_at > ${item.signed_at}::timestamptz))
+      RETURNING id
+    `;
+      if (!admission) return null;
+      await tx`UPDATE clinical.staff_assignments SET ends_at = now() WHERE admission_id = ${item.admission_id} AND user_id = ${item.outgoing_doctor_id} AND assignment_type = 'duty_doctor' AND ends_at IS NULL`;
+      await tx`INSERT INTO clinical.staff_assignments (admission_id, user_id, assignment_type, assigned_by) VALUES (${item.admission_id}, ${actor_user_id}, 'duty_doctor', ${actor_user_id}) ON CONFLICT DO NOTHING`;
+      const [updated] = await tx<
+        Item[]
+      >`UPDATE clinical.ipass_items SET status = 'accepted', readback = ${readback ?? null}, accepted_at = now() WHERE id = ${id} RETURNING *`;
+      await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'accept', 'clinical.ipass_items', ${id}, ${tx.json(updated as unknown as Json)})`;
+      const [remaining] =
+        await tx`SELECT id FROM clinical.ipass_items WHERE session_id = ${item.session_id} AND status <> 'accepted' LIMIT 1`;
+      if (!remaining) {
+        await tx`UPDATE clinical.ipass_sessions SET status = 'completed', completed_at = now() WHERE id = ${item.session_id}`;
+        await tx`UPDATE staff.shifts SET status = 'completed' WHERE user_id = ${item.outgoing_doctor_id} AND status = 'active' AND NOT EXISTS (SELECT 1 FROM clinical.admissions WHERE status = 'active' AND assigned_doctor_id = ${item.outgoing_doctor_id})`;
+      }
+      const [notification] = await tx<
+        { id: string; type: string; payload: Json; created_at: Date }[]
+      >`INSERT INTO clinical.notifications (user_id, type, payload) VALUES (${item.outgoing_doctor_id}, 'ipass.accepted', ${tx.json({ session_id: item.session_id, item_id: id, admission_id: item.admission_id })}) RETURNING *`;
+      await tx`SELECT pg_notify(${notifChannel(item.outgoing_doctor_id)}, ${JSON.stringify(notification)})`;
+      return updated;
+    })
+    .catch(rethrowDatabaseError);
+}
+
+export async function getIpassSessionForItem(id: string) {
+  return db<
+    Session[]
+  >`SELECT s.* FROM clinical.ipass_sessions s JOIN clinical.ipass_items i ON i.session_id = s.id WHERE i.id = ${id}`.catch(
+    rethrowDatabaseError,
+  );
+}
+
+export async function addIpassQuestion(id: string, actor_user_id: string, body: QuestionBodyInput) {
+  return db
+    .begin(async (tx) => {
+      const [session] = await tx<
+        Session[]
+      >`SELECT s.* FROM clinical.ipass_sessions s JOIN clinical.ipass_items i ON i.session_id = s.id
+      WHERE i.id = ${id} AND s.status = 'sent' AND (s.outgoing_doctor_id = ${actor_user_id} OR s.incoming_doctor_id = ${actor_user_id}) FOR UPDATE OF s`;
+      if (!session) return null;
+      const [row] = await tx<
+        Question[]
+      >`INSERT INTO clinical.ipass_questions (item_id, author_id, body) VALUES (${id}, ${actor_user_id}, ${body.body}) RETURNING *`;
+      await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'question', 'clinical.ipass_questions', ${row.id}, ${tx.json(row as unknown as Json)})`;
+      const recipient =
+        actor_user_id === session.outgoing_doctor_id
+          ? session.incoming_doctor_id
+          : session.outgoing_doctor_id;
+      const [notification] = await tx<
+        { id: string; type: string; payload: Json; created_at: Date }[]
+      >`INSERT INTO clinical.notifications (user_id, type, payload) VALUES (${recipient}, 'ipass.question', ${tx.json({ session_id: session.id, item_id: id })}) RETURNING *`;
+      await tx`SELECT pg_notify(${notifChannel(recipient)}, ${JSON.stringify(notification)})`;
+      return row;
+    })
+    .catch(rethrowDatabaseError);
+}
+
+export async function refreshIpassItem(body: ItemBodyInput, id: string, actor_user_id: string) {
+  return db
+    .begin(async (tx) => {
+      const [item] = await tx<(Item & { incoming_doctor_id: string })[]>`
+      UPDATE clinical.ipass_items i SET patient_summary = ${body.patient_summary}, action_list = ${body.action_list}, contingency = ${body.contingency},
+        severity = a.severity, snapshot_revision = a.revision, ward = a.ward, bed = a.bed, signed_at = now()
+      FROM clinical.ipass_sessions s, clinical.admissions a
+      WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'sent' AND s.outgoing_doctor_id = ${actor_user_id} AND i.status = 'signed'
+        AND a.id = i.admission_id AND a.status = 'active' AND a.assigned_doctor_id = ${actor_user_id}
+      RETURNING i.*, s.incoming_doctor_id
+    `;
+      if (!item) return null;
+      await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'refresh', 'clinical.ipass_items', ${id}, ${tx.json(item as unknown as Json)})`;
+      const [notification] = await tx<
+        { id: string; type: string; payload: Json; created_at: Date }[]
+      >`INSERT INTO clinical.notifications (user_id, type, payload) VALUES (${item.incoming_doctor_id}, 'ipass.refreshed', ${tx.json({ session_id: item.session_id, item_id: id })}) RETURNING *`;
+      await tx`SELECT pg_notify(${notifChannel(item.incoming_doctor_id)}, ${JSON.stringify(notification)})`;
+      return item;
+    })
+    .catch(rethrowDatabaseError);
+}
+
+export async function listIpassQuestions(id: string) {
+  return db<
+    Question[]
+  >`SELECT * FROM clinical.ipass_questions WHERE item_id = ${id} ORDER BY created_at`.catch(
+    rethrowDatabaseError,
+  );
+}
+
+export async function cancelIpassSession(id: string, actor_user_id: string) {
+  return db
+    .begin(async (tx) => {
+      const [session] = await tx<
+        Session[]
+      >`UPDATE clinical.ipass_sessions SET status = 'cancelled', completed_at = now() WHERE id = ${id} AND status IN ('draft','sent') RETURNING *`;
+      if (!session) return null;
+      await tx`UPDATE clinical.ipass_items SET status = 'cancelled' WHERE session_id = ${id} AND status IN ('draft','signed')`;
+      await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'cancel', 'clinical.ipass_sessions', ${id}, ${tx.json(session as unknown as Json)})`;
+      return session;
+    })
+    .catch(rethrowDatabaseError);
+}

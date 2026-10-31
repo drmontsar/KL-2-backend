@@ -1,0 +1,31 @@
+[
+  { "table": "staff.users", "rows": [
+    { "id": "11000000-0000-4000-8000-000000000001", "name": "Dr. Arjun Mehta", "role": "doctor", "job_role": "duty_doctor", "registration_number": "KMC-10001", "specialization": "Internal Medicine", "phone": "+1 202 555 0111" },
+    { "id": "11000000-0000-4000-8000-000000000002", "name": "Dr. Priya Shah", "role": "doctor", "job_role": "consultant", "registration_number": "KMC-10002", "specialization": "Critical Care", "phone": "+1 202 555 0112" },
+    { "id": "11000000-0000-4000-8000-000000000003", "name": "Anita Rao RN", "role": "nurse", "job_role": "staff_nurse", "registration_number": "NMC-10003", "specialization": "Critical Care Nursing", "phone": "+1 202 555 0113" },
+    { "id": "11000000-0000-4000-8000-000000000004", "name": "Kiran Patel", "role": "admin", "job_role": "administrator", "registration_number": "ADMIN-10004", "specialization": "Hospital Administration", "phone": "+1 202 555 0114" },
+    { "id": "11000000-0000-4000-8000-000000000005", "name": "Nisha Roy RN", "role": "nurse", "job_role": "staff_nurse", "registration_number": "NMC-10005", "specialization": "Critical Care Nursing", "phone": "+1 202 555 0115" },
+    { "id": "11000000-0000-4000-8000-000000000006", "name": "Dr. Vivek Nair", "role": "doctor", "job_role": "duty_doctor", "registration_number": "KMC-10006", "specialization": "Emergency Medicine", "phone": "+1 202 555 0116" },
+    { "id": "11000000-0000-4000-8000-000000000007", "name": "Bruce Wayne", "role": "doctor", "job_role": "duty_doctor", "registration_number": "KMC-10007", "specialization": "Internal Medicine", "phone": "1112223330" }
+  ] },
+  { "table": "staff.unit_memberships", "rows": [
+    { "user_id": "11000000-0000-4000-8000-000000000001", "unit_id": "10000000-0000-4000-8000-000000000003", "is_primary": true },
+    { "user_id": "11000000-0000-4000-8000-000000000002", "unit_id": "10000000-0000-4000-8000-000000000003", "is_primary": true },
+    { "user_id": "11000000-0000-4000-8000-000000000003", "unit_id": "10000000-0000-4000-8000-000000000003", "is_primary": true },
+    { "user_id": "11000000-0000-4000-8000-000000000004", "unit_id": "10000000-0000-4000-8000-000000000003", "is_primary": true },
+    { "user_id": "11000000-0000-4000-8000-000000000005", "unit_id": "10000000-0000-4000-8000-000000000003", "is_primary": true },
+    { "user_id": "11000000-0000-4000-8000-000000000006", "unit_id": "10000000-0000-4000-8000-000000000003", "is_primary": true },
+    { "user_id": "11000000-0000-4000-8000-000000000007", "unit_id": "10000000-0000-4000-8000-000000000003", "is_primary": true }
+  ] },
+  { "table": "staff.shifts", "rows": [
+    { "id": "11000000-0000-4000-8000-000000000101", "user_id": "11000000-0000-4000-8000-000000000001", "starts_at": "2026-10-28T10:00:00Z", "ends_at": "2026-10-28T22:00:00Z", "status": "active", "created_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "11000000-0000-4000-8000-000000000102", "user_id": "11000000-0000-4000-8000-000000000003", "starts_at": "2026-10-28T10:00:00Z", "ends_at": "2026-10-28T22:00:00Z", "status": "active", "created_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "11000000-0000-4000-8000-000000000103", "user_id": "11000000-0000-4000-8000-000000000007", "starts_at": "2026-10-28T10:00:00Z", "ends_at": "2026-10-28T22:00:00Z", "status": "active", "created_by": "11000000-0000-4000-8000-000000000004" }
+  ] },
+  { "table": "staff.shift_units", "rows": [
+    { "shift_id": "11000000-0000-4000-8000-000000000101", "unit_id": "10000000-0000-4000-8000-000000000003" },
+    { "shift_id": "11000000-0000-4000-8000-000000000102", "unit_id": "10000000-0000-4000-8000-000000000003" },
+    { "shift_id": "11000000-0000-4000-8000-000000000103", "unit_id": "10000000-0000-4000-8000-000000000003" }
+  ] }
+]
+

@@ -1,0 +1,22 @@
+[
+  { "table": "organization.facilities", "rows": [
+    { "id": "10000000-0000-4000-8000-000000000001", "code": "KLINIK-CITY-01", "name": "KliniK City Hospital" }
+  ] },
+  { "table": "organization.departments", "rows": [
+    { "id": "10000000-0000-4000-8000-000000000002", "facility_id": "10000000-0000-4000-8000-000000000001", "code": "CRITICAL-CARE", "name": "Critical Care" }
+  ] },
+  { "table": "organization.units", "rows": [
+    { "id": "10000000-0000-4000-8000-000000000003", "department_id": "10000000-0000-4000-8000-000000000002", "code": "MICU", "name": "Medical ICU", "kind": "icu" }
+  ] },
+  { "table": "organization.wards", "rows": [
+    { "id": "10000000-0000-4000-8000-000000000004", "unit_id": "10000000-0000-4000-8000-000000000003", "name": "Medical ICU" }
+  ] },
+  { "table": "organization.rooms", "rows": [
+    { "id": "10000000-0000-4000-8000-000000000005", "ward_id": "10000000-0000-4000-8000-000000000004", "name": "ICU Bay A" }
+  ] },
+  { "table": "organization.beds", "rows": [
+    { "id": "10000000-0000-4000-8000-000000000011", "room_id": "10000000-0000-4000-8000-000000000005", "label": "MICU-01" },
+    { "id": "10000000-0000-4000-8000-000000000012", "room_id": "10000000-0000-4000-8000-000000000005", "label": "MICU-02" },
+    { "id": "10000000-0000-4000-8000-000000000013", "room_id": "10000000-0000-4000-8000-000000000005", "label": "MICU-03" }
+  ] }
+]

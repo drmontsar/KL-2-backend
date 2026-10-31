@@ -1,0 +1,6 @@
+{
+  "dataset_id": "klinik-hospital-v1",
+  "description": "Fictional, non-clinical reference data for the KliniK test environment.",
+  "snapshot_at": "2026-10-28T10:00:00Z",
+  "files": ["organization.json", "staff.json", "catalogs.json", "patients.json", "clinical.json", "workflows.json"]
+}
