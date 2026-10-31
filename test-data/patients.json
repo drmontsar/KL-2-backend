@@ -1,0 +1,33 @@
+[
+  { "table": "clinical.patients", "rows": [
+    { "id": "13000000-0000-4000-8000-000000000001", "uhid": "UH-90000001", "name": "Ananya Sharma", "dob": "1975-04-12", "sex": "female", "blood_group": "O+", "phone": "+1 202 555 0101", "address": "24 Lake Road, Bengaluru", "abha_id": "99-0000-0000-0001", "allergies": [{ "allergen": "Penicillin", "reaction": "Rash", "severity": "moderate" }], "created_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "13000000-0000-4000-8000-000000000002", "uhid": "UH-90000002", "name": "Rohan Kapoor", "dob": "1968-09-21", "sex": "male", "blood_group": "A+", "phone": "+1 202 555 0102", "address": "17 Park Street, Bengaluru", "abha_id": "99-0000-0000-0002", "allergies": [], "created_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "13000000-0000-4000-8000-000000000003", "uhid": "UH-90000003", "name": "Meera Iyer", "dob": "1992-02-14", "sex": "female", "blood_group": "B+", "phone": "+1 202 555 0103", "address": "8 Garden Avenue, Bengaluru", "abha_id": "99-0000-0000-0003", "allergies": [], "created_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "13000000-0000-4000-8000-000000000004", "uhid": "UH-90000004", "name": "Sanjay Verma", "dob": "1986-06-18", "sex": "male", "blood_group": "AB+", "phone": "+1 202 555 0104", "address": "12 Residency Road, Bengaluru", "abha_id": "99-0000-0000-0004", "allergies": [], "created_by": "11000000-0000-4000-8000-000000000001" }
+  ] },
+  { "table": "clinical.patient_identifiers", "rows": [
+    { "id": "13000000-0000-4000-8000-000000000101", "patient_id": "13000000-0000-4000-8000-000000000001", "type": "uhid", "value": "UH-90000001", "issuer": "KliniK" },
+    { "id": "13000000-0000-4000-8000-000000000102", "patient_id": "13000000-0000-4000-8000-000000000001", "type": "abha", "value": "99-0000-0000-0001", "issuer": "ABHA" },
+    { "id": "13000000-0000-4000-8000-000000000103", "patient_id": "13000000-0000-4000-8000-000000000002", "type": "uhid", "value": "UH-90000002", "issuer": "KliniK" },
+    { "id": "13000000-0000-4000-8000-000000000104", "patient_id": "13000000-0000-4000-8000-000000000002", "type": "abha", "value": "99-0000-0000-0002", "issuer": "ABHA" },
+    { "id": "13000000-0000-4000-8000-000000000105", "patient_id": "13000000-0000-4000-8000-000000000003", "type": "uhid", "value": "UH-90000003", "issuer": "KliniK" },
+    { "id": "13000000-0000-4000-8000-000000000106", "patient_id": "13000000-0000-4000-8000-000000000003", "type": "abha", "value": "99-0000-0000-0003", "issuer": "ABHA" },
+    { "id": "13000000-0000-4000-8000-000000000107", "patient_id": "13000000-0000-4000-8000-000000000004", "type": "uhid", "value": "UH-90000004", "issuer": "KliniK" },
+    { "id": "13000000-0000-4000-8000-000000000108", "patient_id": "13000000-0000-4000-8000-000000000004", "type": "abha", "value": "99-0000-0000-0004", "issuer": "ABHA" }
+  ] },
+  { "table": "clinical.patient_contacts", "rows": [
+    { "id": "13000000-0000-4000-8000-000000000201", "patient_id": "13000000-0000-4000-8000-000000000001", "type": "phone", "label": "Mobile", "value": "+1 202 555 0101", "is_primary": true },
+    { "id": "13000000-0000-4000-8000-000000000202", "patient_id": "13000000-0000-4000-8000-000000000002", "type": "phone", "label": "Mobile", "value": "+1 202 555 0102", "is_primary": true },
+    { "id": "13000000-0000-4000-8000-000000000203", "patient_id": "13000000-0000-4000-8000-000000000003", "type": "phone", "label": "Mobile", "value": "+1 202 555 0103", "is_primary": true },
+    { "id": "13000000-0000-4000-8000-000000000204", "patient_id": "13000000-0000-4000-8000-000000000004", "type": "phone", "label": "Mobile", "value": "+1 202 555 0104", "is_primary": true }
+  ] },
+  { "table": "clinical.next_of_kin", "rows": [
+    { "id": "13000000-0000-4000-8000-000000000301", "patient_id": "13000000-0000-4000-8000-000000000001", "name": "Ravi Sharma", "relationship": "Spouse", "phone": "+1 202 555 0121", "address": "24 Lake Road, Bengaluru", "is_primary": true },
+    { "id": "13000000-0000-4000-8000-000000000302", "patient_id": "13000000-0000-4000-8000-000000000002", "name": "Neha Kapoor", "relationship": "Daughter", "phone": "+1 202 555 0122", "address": "17 Park Street, Bengaluru", "is_primary": true },
+    { "id": "13000000-0000-4000-8000-000000000303", "patient_id": "13000000-0000-4000-8000-000000000003", "name": "Kavita Iyer", "relationship": "Parent", "phone": "+1 202 555 0123", "address": "8 Garden Avenue, Bengaluru", "is_primary": true },
+    { "id": "13000000-0000-4000-8000-000000000304", "patient_id": "13000000-0000-4000-8000-000000000004", "name": "Riya Verma", "relationship": "Spouse", "phone": "+1 202 555 0124", "address": "12 Residency Road, Bengaluru", "is_primary": true }
+  ] },
+  { "table": "clinical.patient_coverage", "rows": [
+    { "id": "13000000-0000-4000-8000-000000000401", "patient_id": "13000000-0000-4000-8000-000000000001", "payer_name": "National Health Assurance", "policy_number": "NHA-90000001", "member_id": "M-90000001", "valid_from": "2025-01-01", "valid_until": "2030-12-31", "is_primary": true }
+  ] }
+]

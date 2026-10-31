@@ -4,10 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "server": "bun run src/backend/server.ts",
-    "migrate": "bun run src/backend/db/migrate.ts",
-    "seed": "bun run src/backend/db/seed.ts",
-    "check": "tsc --noEmit"
+    "server": "bun run src/main.ts",
+    "migrate": "bun run src/db/migrate.ts",
+    "seed": "bun run src/db/seed-test-data.ts",
+    "reset:demo": "bun run src/db/seed-test-data.ts --reset",
+    "assign:test-user": "bun run src/db/assign-test-user.ts",
+    "check": "tsc --noEmit",
+    "test": "bun test",
+    "test:integration": "bash scripts/test-integration.sh",
+    "verify": "bun run check && bun test && bun run test:integration"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.6.1",

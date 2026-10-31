@@ -1,0 +1,69 @@
+[
+  { "table": "clinical.admissions", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000001", "patient_id": "13000000-0000-4000-8000-000000000001", "ward": "Medical ICU", "bed": "MICU-01", "admitted_at": "2026-10-27T10:00:00Z", "bed_id": "10000000-0000-4000-8000-000000000011", "unit_id": "10000000-0000-4000-8000-000000000003", "severity": "watcher", "assigned_doctor_id": "11000000-0000-4000-8000-000000000001", "assigned_to": "11000000-0000-4000-8000-000000000003", "created_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "14000000-0000-4000-8000-000000000002", "patient_id": "13000000-0000-4000-8000-000000000002", "ward": "Medical ICU", "bed": "MICU-02", "admitted_at": "2026-10-27T10:00:00Z", "bed_id": "10000000-0000-4000-8000-000000000012", "unit_id": "10000000-0000-4000-8000-000000000003", "severity": "stable", "assigned_doctor_id": "11000000-0000-4000-8000-000000000001", "assigned_to": "11000000-0000-4000-8000-000000000003", "created_by": "11000000-0000-4000-8000-000000000001" }
+  ] },
+  { "table": "clinical.bed_assignments", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000101", "admission_id": "14000000-0000-4000-8000-000000000001", "bed_id": "10000000-0000-4000-8000-000000000011", "assigned_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "14000000-0000-4000-8000-000000000102", "admission_id": "14000000-0000-4000-8000-000000000002", "bed_id": "10000000-0000-4000-8000-000000000012", "assigned_by": "11000000-0000-4000-8000-000000000004" }
+  ] },
+  { "table": "clinical.staff_assignments", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000201", "admission_id": "14000000-0000-4000-8000-000000000001", "user_id": "11000000-0000-4000-8000-000000000001", "assignment_type": "duty_doctor", "assigned_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "14000000-0000-4000-8000-000000000202", "admission_id": "14000000-0000-4000-8000-000000000001", "user_id": "11000000-0000-4000-8000-000000000002", "assignment_type": "treating_consultant", "assigned_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "14000000-0000-4000-8000-000000000203", "admission_id": "14000000-0000-4000-8000-000000000001", "user_id": "11000000-0000-4000-8000-000000000003", "assignment_type": "primary_nurse", "assigned_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "14000000-0000-4000-8000-000000000204", "admission_id": "14000000-0000-4000-8000-000000000002", "user_id": "11000000-0000-4000-8000-000000000001", "assignment_type": "duty_doctor", "assigned_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "14000000-0000-4000-8000-000000000205", "admission_id": "14000000-0000-4000-8000-000000000002", "user_id": "11000000-0000-4000-8000-000000000002", "assignment_type": "treating_consultant", "assigned_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "14000000-0000-4000-8000-000000000206", "admission_id": "14000000-0000-4000-8000-000000000002", "user_id": "11000000-0000-4000-8000-000000000003", "assignment_type": "primary_nurse", "assigned_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "14000000-0000-4000-8000-000000000207", "admission_id": "14000000-0000-4000-8000-000000000001", "user_id": "11000000-0000-4000-8000-000000000007", "assignment_type": "coverage", "assigned_by": "11000000-0000-4000-8000-000000000004" },
+    { "id": "14000000-0000-4000-8000-000000000208", "admission_id": "14000000-0000-4000-8000-000000000002", "user_id": "11000000-0000-4000-8000-000000000007", "assignment_type": "coverage", "assigned_by": "11000000-0000-4000-8000-000000000004" }
+  ] },
+  { "table": "clinical.diagnoses", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000301", "patient_id": "13000000-0000-4000-8000-000000000001", "admission_id": "14000000-0000-4000-8000-000000000001", "description": "Community-acquired pneumonia", "created_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "14000000-0000-4000-8000-000000000302", "patient_id": "13000000-0000-4000-8000-000000000002", "admission_id": "14000000-0000-4000-8000-000000000002", "description": "Diabetes mellitus, type 2", "created_by": "11000000-0000-4000-8000-000000000001" }
+  ] },
+  { "table": "clinical.vitals", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000401", "admission_id": "14000000-0000-4000-8000-000000000001", "recorded_by": "11000000-0000-4000-8000-000000000003", "recorded_at": "2026-10-28T10:00:00Z", "bp_systolic": 110, "bp_diastolic": 70, "heart_rate": 100, "spo2": 94, "resp_rate": 22, "temperature": 38.2, "on_supplemental_oxygen": false, "consciousness": "alert", "news2_score": 6, "news2_escalation": "medium", "news2_component_scores": { "resp_rate": 2, "spo2": 1, "supplemental_oxygen": 0, "temperature": 1, "bp_systolic": 1, "heart_rate": 1, "consciousness": 0 }, "news2_rule_version": "NEWS2-2017-scale-1" },
+    { "id": "14000000-0000-4000-8000-000000000402", "admission_id": "14000000-0000-4000-8000-000000000002", "recorded_by": "11000000-0000-4000-8000-000000000003", "recorded_at": "2026-10-28T10:00:00Z", "bp_systolic": 120, "bp_diastolic": 80, "heart_rate": 75, "spo2": 98, "resp_rate": 16, "temperature": 37.0, "on_supplemental_oxygen": false, "consciousness": "alert", "news2_score": 0, "news2_escalation": "low", "news2_component_scores": { "resp_rate": 0, "spo2": 0, "supplemental_oxygen": 0, "temperature": 0, "bp_systolic": 0, "heart_rate": 0, "consciousness": 0 }, "news2_rule_version": "NEWS2-2017-scale-1" }
+  ] },
+  { "table": "clinical.observation_schedules", "rows": [
+    { "admission_id": "14000000-0000-4000-8000-000000000001", "frequency_minutes": 60, "next_due_at": "2026-10-28T11:00:00Z", "source": "news2_policy", "policy_version": "NEWS2-2017-scale-1", "updated_by": "11000000-0000-4000-8000-000000000003" },
+    { "admission_id": "14000000-0000-4000-8000-000000000002", "frequency_minutes": 720, "next_due_at": "2026-10-28T22:00:00Z", "source": "news2_policy", "policy_version": "NEWS2-2017-scale-1", "updated_by": "11000000-0000-4000-8000-000000000003" }
+  ] },
+  { "table": "clinical.alerts", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000501", "admission_id": "14000000-0000-4000-8000-000000000001", "source_vitals_id": "14000000-0000-4000-8000-000000000401", "type": "news2", "severity": "caution", "message": "NEWS2 6: urgent review required" }
+  ] },
+  { "table": "clinical.notes", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000601", "admission_id": "14000000-0000-4000-8000-000000000001", "kind": "progress", "draft_body": "Patient reviewed. Continue monitoring and consultant review.", "created_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "14000000-0000-4000-8000-000000000603", "admission_id": "14000000-0000-4000-8000-000000000002", "kind": "consultant_round", "draft_body": "Patient comfortable. Continue current care and review discharge plan.", "created_by": "11000000-0000-4000-8000-000000000002" }
+  ] },
+  { "table": "clinical.note_versions", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000602", "note_id": "14000000-0000-4000-8000-000000000601", "version_no": 1, "body": "Patient reviewed. Continue monitoring and consultant review.", "confirmed_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "14000000-0000-4000-8000-000000000604", "note_id": "14000000-0000-4000-8000-000000000603", "version_no": 1, "body": "Patient comfortable. Continue current care and review discharge plan.", "confirmed_by": "11000000-0000-4000-8000-000000000002" }
+  ] },
+  { "table": "clinical.consultant_rounds", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000605", "admission_id": "14000000-0000-4000-8000-000000000002", "consultant_id": "11000000-0000-4000-8000-000000000002", "subjective": "Patient feels comfortable", "objective": "Observations stable", "assessment": "Clinical status improving", "plan": "Continue care and review discharge plan", "note_id": "14000000-0000-4000-8000-000000000603", "signed_at": "2026-10-28T10:00:00Z" }
+  ] },
+  { "table": "clinical.orders", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000701", "admission_id": "14000000-0000-4000-8000-000000000001", "kind": "medication", "payload": { "drug": "Paracetamol 500 mg", "dose": "500 mg", "route": "oral", "catalog_id": "12000000-0000-4000-8000-000000000001" }, "priority": "routine", "status": "confirmed", "created_by": "11000000-0000-4000-8000-000000000001", "confirmed_by": "11000000-0000-4000-8000-000000000001", "confirmed_at": "2026-10-28T10:00:00Z" },
+    { "id": "14000000-0000-4000-8000-000000000702", "admission_id": "14000000-0000-4000-8000-000000000001", "kind": "laboratory", "payload": { "test": "Complete blood count" }, "priority": "stat", "status": "confirmed", "created_by": "11000000-0000-4000-8000-000000000001", "confirmed_by": "11000000-0000-4000-8000-000000000001", "confirmed_at": "2026-10-28T10:00:00Z" },
+    { "id": "14000000-0000-4000-8000-000000000703", "admission_id": "14000000-0000-4000-8000-000000000002", "kind": "medication", "payload": { "drug": "Sodium chloride 0.9% 500 ml", "dose": "500 ml", "route": "IV infusion", "catalog_id": "12000000-0000-4000-8000-000000000003" }, "priority": "routine", "status": "confirmed", "created_by": "11000000-0000-4000-8000-000000000001", "confirmed_by": "11000000-0000-4000-8000-000000000001", "confirmed_at": "2026-10-28T10:00:00Z" }
+  ] },
+  { "table": "clinical.tasks", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000801", "order_id": "14000000-0000-4000-8000-000000000701", "admission_id": "14000000-0000-4000-8000-000000000001", "due_at": "2026-10-28T11:00:00Z" },
+    { "id": "14000000-0000-4000-8000-000000000802", "order_id": "14000000-0000-4000-8000-000000000702", "admission_id": "14000000-0000-4000-8000-000000000001", "due_at": "2026-10-28T10:30:00Z" }
+  ] },
+  { "table": "clinical.medication_schedules", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000901", "admission_id": "14000000-0000-4000-8000-000000000001", "order_id": "14000000-0000-4000-8000-000000000701", "drug": "Paracetamol 500 mg", "dose": "500 mg", "route": "oral", "catalog_id": "12000000-0000-4000-8000-000000000001", "created_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "14000000-0000-4000-8000-000000000904", "admission_id": "14000000-0000-4000-8000-000000000002", "order_id": "14000000-0000-4000-8000-000000000703", "drug": "Sodium chloride 0.9% 500 ml", "dose": "500 ml", "route": "IV infusion", "catalog_id": "12000000-0000-4000-8000-000000000003", "created_by": "11000000-0000-4000-8000-000000000001" }
+  ] },
+  { "table": "clinical.medication_allergy_reviews", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000902", "schedule_id": "14000000-0000-4000-8000-000000000901", "patient_revision": 1, "decision": "safe", "reason": "Allergies reviewed", "reviewed_by": "11000000-0000-4000-8000-000000000001" },
+    { "id": "14000000-0000-4000-8000-000000000905", "schedule_id": "14000000-0000-4000-8000-000000000904", "patient_revision": 1, "decision": "safe", "reason": "Allergies reviewed", "reviewed_by": "11000000-0000-4000-8000-000000000001" }
+  ] },
+  { "table": "clinical.medication_doses", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000903", "schedule_id": "14000000-0000-4000-8000-000000000901", "due_at": "2026-10-28T11:00:00Z" }
+  ] },
+  { "table": "clinical.infusion_events", "rows": [
+    { "id": "14000000-0000-4000-8000-000000000906", "schedule_id": "14000000-0000-4000-8000-000000000904", "action": "start", "rate": "50 ml/h", "reason": "As prescribed", "recorded_by": "11000000-0000-4000-8000-000000000003", "recorded_at": "2026-10-28T10:00:00Z" }
+  ] }
+]

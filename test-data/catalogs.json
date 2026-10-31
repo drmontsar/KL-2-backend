@@ -1,0 +1,34 @@
+[
+  { "table": "clinical.medication_catalog", "rows": [
+    { "id": "12000000-0000-4000-8000-000000000001", "code": "PARA-500", "brand": "Paracetamol 500 mg", "ingredient": "paracetamol", "drug_class": "Analgesic", "in_stock": true, "synthetic": true },
+    { "id": "12000000-0000-4000-8000-000000000002", "code": "AMOX-500", "brand": "Amoxicillin 500 mg", "ingredient": "amoxicillin", "drug_class": "Penicillin", "in_stock": true, "synthetic": true },
+    { "id": "12000000-0000-4000-8000-000000000003", "code": "SALINE-500", "brand": "Sodium chloride 0.9% 500 ml", "ingredient": "sodium chloride", "drug_class": "Intravenous fluid", "in_stock": true, "synthetic": true }
+  ] },
+  { "table": "clinical.medication_catalog_allergens", "rows": [
+    { "medication_id": "12000000-0000-4000-8000-000000000001", "allergen": "paracetamol" },
+    { "medication_id": "12000000-0000-4000-8000-000000000002", "allergen": "amoxicillin" },
+    { "medication_id": "12000000-0000-4000-8000-000000000002", "allergen": "penicillin" },
+    { "medication_id": "12000000-0000-4000-8000-000000000003", "allergen": "sodium chloride" }
+  ] },
+  { "table": "opd.diagnosis_catalog", "rows": [
+    { "code": "R50.9", "description": "Fever, unspecified", "synthetic": true },
+    { "code": "R51.9", "description": "Headache, unspecified", "synthetic": true },
+    { "code": "E11.9", "description": "Type 2 diabetes mellitus without complications", "synthetic": true }
+  ] },
+  { "table": "opd.investigation_catalog", "rows": [
+    { "code": "CBC", "name": "Complete blood count", "price": "300.00", "currency": "INR", "synthetic": true },
+    { "code": "CXR", "name": "Chest X-ray", "price": "500.00", "currency": "INR", "synthetic": true }
+  ] },
+  { "table": "forms.templates", "rows": [
+    { "id": "12000000-0000-4000-8000-000000000010", "name": "General consent for admission and treatment", "category": "Consent", "created_by": "11000000-0000-4000-8000-000000000001" }
+  ] },
+  { "table": "forms.template_versions", "rows": [
+    { "id": "12000000-0000-4000-8000-000000000011", "template_id": "12000000-0000-4000-8000-000000000010", "version": 1, "fields": [
+      { "key": "patient_name", "label": "Patient name", "type": "text", "source": "name", "required": true },
+      { "key": "uhid", "label": "UHID", "type": "text", "source": "uhid", "required": true },
+      { "key": "details", "label": "Consent details", "type": "long_text", "required": true },
+      { "key": "doctor_signature", "label": "Treating doctor", "type": "signature", "signer_role": "doctor", "required": true },
+      { "key": "patient_signature", "label": "Patient or guardian", "type": "signature", "signer_role": "patient", "required": true }
+    ], "synthetic": true, "created_by": "11000000-0000-4000-8000-000000000001" }
+  ] }
+]
