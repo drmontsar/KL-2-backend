@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: klinik
+          POSTGRES_USER: klinik
+          POSTGRES_PASSWORD: klinik
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U klinik -d klinik"
+          --health-interval=10s
+          --timeout=5s
+          --retries=5
+
+    env:
+      DATABASE_URL: postgres://klinik:klinik@127.0.0.1:5432/klinik
+      NODE_ENV: test
+      PORT: 3001
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        run: bun install
+
+      - name: Type check
+        run: bun run check
+
+      - name: Run migrations
+        run: bun run migrate
+
+      - name: Run tests
+        run: bun test

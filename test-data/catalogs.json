@@ -1,34 +1,831 @@
 [
-  { "table": "clinical.medication_catalog", "rows": [
-    { "id": "12000000-0000-4000-8000-000000000001", "code": "PARA-500", "brand": "Paracetamol 500 mg", "ingredient": "paracetamol", "drug_class": "Analgesic", "in_stock": true, "synthetic": true },
-    { "id": "12000000-0000-4000-8000-000000000002", "code": "AMOX-500", "brand": "Amoxicillin 500 mg", "ingredient": "amoxicillin", "drug_class": "Penicillin", "in_stock": true, "synthetic": true },
-    { "id": "12000000-0000-4000-8000-000000000003", "code": "SALINE-500", "brand": "Sodium chloride 0.9% 500 ml", "ingredient": "sodium chloride", "drug_class": "Intravenous fluid", "in_stock": true, "synthetic": true }
-  ] },
-  { "table": "clinical.medication_catalog_allergens", "rows": [
-    { "medication_id": "12000000-0000-4000-8000-000000000001", "allergen": "paracetamol" },
-    { "medication_id": "12000000-0000-4000-8000-000000000002", "allergen": "amoxicillin" },
-    { "medication_id": "12000000-0000-4000-8000-000000000002", "allergen": "penicillin" },
-    { "medication_id": "12000000-0000-4000-8000-000000000003", "allergen": "sodium chloride" }
-  ] },
-  { "table": "opd.diagnosis_catalog", "rows": [
-    { "code": "R50.9", "description": "Fever, unspecified", "synthetic": true },
-    { "code": "R51.9", "description": "Headache, unspecified", "synthetic": true },
-    { "code": "E11.9", "description": "Type 2 diabetes mellitus without complications", "synthetic": true }
-  ] },
-  { "table": "opd.investigation_catalog", "rows": [
-    { "code": "CBC", "name": "Complete blood count", "price": "300.00", "currency": "INR", "synthetic": true },
-    { "code": "CXR", "name": "Chest X-ray", "price": "500.00", "currency": "INR", "synthetic": true }
-  ] },
-  { "table": "forms.templates", "rows": [
-    { "id": "12000000-0000-4000-8000-000000000010", "name": "General consent for admission and treatment", "category": "Consent", "created_by": "11000000-0000-4000-8000-000000000001" }
-  ] },
-  { "table": "forms.template_versions", "rows": [
-    { "id": "12000000-0000-4000-8000-000000000011", "template_id": "12000000-0000-4000-8000-000000000010", "version": 1, "fields": [
-      { "key": "patient_name", "label": "Patient name", "type": "text", "source": "name", "required": true },
-      { "key": "uhid", "label": "UHID", "type": "text", "source": "uhid", "required": true },
-      { "key": "details", "label": "Consent details", "type": "long_text", "required": true },
-      { "key": "doctor_signature", "label": "Treating doctor", "type": "signature", "signer_role": "doctor", "required": true },
-      { "key": "patient_signature", "label": "Patient or guardian", "type": "signature", "signer_role": "patient", "required": true }
-    ], "synthetic": true, "created_by": "11000000-0000-4000-8000-000000000001" }
-  ] }
+  {
+    "table": "clinical.medication_catalog",
+    "rows": [
+      {
+        "id": "12000000-0000-4000-8000-000000000001",
+        "code": "PARA-500",
+        "brand": "Paracetamol 500 mg",
+        "ingredient": "paracetamol",
+        "drug_class": "Analgesic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000002",
+        "code": "AMOX-500",
+        "brand": "Amoxicillin 500 mg",
+        "ingredient": "amoxicillin",
+        "drug_class": "Penicillin",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000003",
+        "code": "SALINE-500",
+        "brand": "Sodium chloride 0.9% 500 ml",
+        "ingredient": "sodium chloride",
+        "drug_class": "Intravenous fluid",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000004",
+        "code": "AMLO-5",
+        "brand": "Amlodipine 5 mg",
+        "ingredient": "amlodipine",
+        "drug_class": "Calcium channel blocker",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000005",
+        "code": "ATOR-10",
+        "brand": "Atorvastatin 10 mg",
+        "ingredient": "atorvastatin",
+        "drug_class": "Lipid-lowering agent",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000006",
+        "code": "METF-500",
+        "brand": "Metformin 500 mg",
+        "ingredient": "metformin",
+        "drug_class": "Antidiabetic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000007",
+        "code": "OMEP-20",
+        "brand": "Omeprazole 20 mg",
+        "ingredient": "omeprazole",
+        "drug_class": "Proton pump inhibitor",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000008",
+        "code": "CETI-10",
+        "brand": "Cetirizine 10 mg",
+        "ingredient": "cetirizine",
+        "drug_class": "Antihistamine",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000009",
+        "code": "SALB-100",
+        "brand": "Salbutamol inhaler",
+        "ingredient": "salbutamol",
+        "drug_class": "Bronchodilator",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000010",
+        "code": "ALBE-400",
+        "brand": "Albendazole 400 mg",
+        "ingredient": "albendazole",
+        "drug_class": "Anthelmintic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000011",
+        "code": "CIPO-500",
+        "brand": "Ciprofloxacin 500 mg",
+        "ingredient": "ciprofloxacin",
+        "drug_class": "Antibiotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000012",
+        "code": "LOSA-50",
+        "brand": "Losartan 50 mg",
+        "ingredient": "losartan",
+        "drug_class": "ARB",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000013",
+        "code": "HCTZ-12",
+        "brand": "Hydrochlorothiazide 12.5 mg",
+        "ingredient": "hydrochlorothiazide",
+        "drug_class": "Diuretic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000014",
+        "code": "PRED-5",
+        "brand": "Prednisolone 5 mg",
+        "ingredient": "prednisolone",
+        "drug_class": "Corticosteroid",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000015",
+        "code": "THYR-50",
+        "brand": "Levothyroxine 50 mcg",
+        "ingredient": "levothyroxine",
+        "drug_class": "Thyroid hormone",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000016",
+        "code": "DOMP-10",
+        "brand": "Domperidone 10 mg",
+        "ingredient": "domperidone",
+        "drug_class": "Gastrointestinal agent",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000017",
+        "code": "B12-500",
+        "brand": "Vitamin B12 500 mcg",
+        "ingredient": "cyanocobalamin",
+        "drug_class": "Vitamin supplement",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000018",
+        "code": "IRON-FA",
+        "brand": "Iron folic acid",
+        "ingredient": "ferrous fumarate",
+        "drug_class": "Hematinic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000019",
+        "code": "DICY-10",
+        "brand": "Dicyclomine 10 mg",
+        "ingredient": "dicyclomine",
+        "drug_class": "Antispasmodic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000020",
+        "code": "AZIT-250",
+        "brand": "Azithromycin 250 mg",
+        "ingredient": "azithromycin",
+        "drug_class": "Antibiotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000021",
+        "code": "CLOP-75",
+        "brand": "Clopidogrel 75 mg",
+        "ingredient": "clopidogrel",
+        "drug_class": "Antiplatelet",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000022",
+        "code": "FURO-20",
+        "brand": "Furosemide 20 mg",
+        "ingredient": "furosemide",
+        "drug_class": "Loop diuretic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000023",
+        "code": "FLUX-20",
+        "brand": "Fluoxetine 20 mg",
+        "ingredient": "fluoxetine",
+        "drug_class": "SSRI",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000024",
+        "code": "TELM-40",
+        "brand": "Telmisartan 40 mg",
+        "ingredient": "telmisartan",
+        "drug_class": "ARB",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000025",
+        "code": "PANT-40",
+        "brand": "Pantoprazole 40 mg",
+        "ingredient": "pantoprazole",
+        "drug_class": "Proton pump inhibitor",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000026",
+        "code": "AMOX-625",
+        "brand": "Amoxiclav 625 mg",
+        "ingredient": "amoxicillin + clavulanate",
+        "drug_class": "Antibiotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000027",
+        "code": "SIMV-20",
+        "brand": "Simvastatin 20 mg",
+        "ingredient": "simvastatin",
+        "drug_class": "Lipid-lowering agent",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000028",
+        "code": "RANI-150",
+        "brand": "Ranitidine 150 mg",
+        "ingredient": "ranitidine",
+        "drug_class": "H2 blocker",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000029",
+        "code": "IBUP-400",
+        "brand": "Ibuprofen 400 mg",
+        "ingredient": "ibuprofen",
+        "drug_class": "NSAID",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000030",
+        "code": "DICL-50",
+        "brand": "Diclofenac 50 mg",
+        "ingredient": "diclofenac",
+        "drug_class": "NSAID",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000031",
+        "code": "LOPE-2",
+        "brand": "Loperamide 2 mg",
+        "ingredient": "loperamide",
+        "drug_class": "Antidiarrheal",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000032",
+        "code": "METO-25",
+        "brand": "Metoprolol 25 mg",
+        "ingredient": "metoprolol",
+        "drug_class": "Beta blocker",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000033",
+        "code": "AMLO-ATE",
+        "brand": "Amlodipine + Atenolol",
+        "ingredient": "amlodipine",
+        "drug_class": "Antihypertensive",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000034",
+        "code": "GLIM-2",
+        "brand": "Glimepiride 2 mg",
+        "ingredient": "glimepiride",
+        "drug_class": "Antidiabetic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000035",
+        "code": "TAMS-04",
+        "brand": "Tamsulosin 0.4 mg",
+        "ingredient": "tamsulosin",
+        "drug_class": "Alpha blocker",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000036",
+        "code": "BUDE-3",
+        "brand": "Budesonide 3 mg",
+        "ingredient": "budesonide",
+        "drug_class": "Corticosteroid",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000037",
+        "code": "LORA-10",
+        "brand": "Loratadine 10 mg",
+        "ingredient": "loratadine",
+        "drug_class": "Antihistamine",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000038",
+        "code": "NAPR-250",
+        "brand": "Naproxen 250 mg",
+        "ingredient": "naproxen",
+        "drug_class": "NSAID",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000039",
+        "code": "CEFI-200",
+        "brand": "Cefixime 200 mg",
+        "ingredient": "cefixime",
+        "drug_class": "Antibiotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000040",
+        "code": "BROM-8",
+        "brand": "Bromhexine 8 mg",
+        "ingredient": "bromhexine",
+        "drug_class": "Expectorant",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000041",
+        "code": "MONT-10",
+        "brand": "Montelukast 10 mg",
+        "ingredient": "montelukast",
+        "drug_class": "Leukotriene antagonist",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000042",
+        "code": "VERA-40",
+        "brand": "Verapamil 40 mg",
+        "ingredient": "verapamil",
+        "drug_class": "Calcium channel blocker",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000043",
+        "code": "GENT-EYE",
+        "brand": "Gentamicin eye drops",
+        "ingredient": "gentamicin",
+        "drug_class": "Antibiotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000044",
+        "code": "KETO-200",
+        "brand": "Ketoconazole 200 mg",
+        "ingredient": "ketoconazole",
+        "drug_class": "Antifungal",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000045",
+        "code": "METH-4",
+        "brand": "Methylprednisolone 4 mg",
+        "ingredient": "methylprednisolone",
+        "drug_class": "Corticosteroid",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000046",
+        "code": "QUET-25",
+        "brand": "Quetiapine 25 mg",
+        "ingredient": "quetiapine",
+        "drug_class": "Antipsychotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000047",
+        "code": "SERT-50",
+        "brand": "Sertraline 50 mg",
+        "ingredient": "sertraline",
+        "drug_class": "SSRI",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000048",
+        "code": "GLIC-80",
+        "brand": "Gliclazide 80 mg",
+        "ingredient": "gliclazide",
+        "drug_class": "Antidiabetic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000049",
+        "code": "TOLT-2",
+        "brand": "Tolterodine 2 mg",
+        "ingredient": "tolterodine",
+        "drug_class": "Antimuscarinic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000050",
+        "code": "LEVO-500",
+        "brand": "Levofloxacin 500 mg",
+        "ingredient": "levofloxacin",
+        "drug_class": "Antibiotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000051",
+        "code": "DOXY-100",
+        "brand": "Doxycycline 100 mg",
+        "ingredient": "doxycycline",
+        "drug_class": "Antibiotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000052",
+        "code": "AMBR-30",
+        "brand": "Ambroxol 30 mg",
+        "ingredient": "ambroxol",
+        "drug_class": "Expectorant",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000053",
+        "code": "COUGH-SY",
+        "brand": "Cough syrup",
+        "ingredient": "ambroxol",
+        "drug_class": "Expectorant",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000054",
+        "code": "ZINC-50",
+        "brand": "Zinc sulphate 50 mg",
+        "ingredient": "zinc sulphate",
+        "drug_class": "Supplement",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000055",
+        "code": "MECZ-500",
+        "brand": "Mecobalamin 500 mcg",
+        "ingredient": "methylcobalamin",
+        "drug_class": "Vitamin B12",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000056",
+        "code": "RABE-20",
+        "brand": "Rabeprazole 20 mg",
+        "ingredient": "rabeprazole",
+        "drug_class": "Proton pump inhibitor",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000057",
+        "code": "ALPR-1",
+        "brand": "Alprazolam 0.25 mg",
+        "ingredient": "alprazolam",
+        "drug_class": "Benzodiazepine",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000058",
+        "code": "VITD-60",
+        "brand": "Vitamin D3 60k IU",
+        "ingredient": "cholecalciferol",
+        "drug_class": "Vitamin supplement",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000059",
+        "code": "PIPT-400",
+        "brand": "Piperacillin 400 mg",
+        "ingredient": "piperacillin",
+        "drug_class": "Antibiotic",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100060",
+        "code": "MED-060",
+        "brand": "Medication 60",
+        "ingredient": "medication-60",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100062",
+        "code": "MED-062",
+        "brand": "Medication 62",
+        "ingredient": "medication-62",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100064",
+        "code": "MED-064",
+        "brand": "Medication 64",
+        "ingredient": "medication-64",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100066",
+        "code": "MED-066",
+        "brand": "Medication 66",
+        "ingredient": "medication-66",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100068",
+        "code": "MED-068",
+        "brand": "Medication 68",
+        "ingredient": "medication-68",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100070",
+        "code": "MED-070",
+        "brand": "Medication 70",
+        "ingredient": "medication-70",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100072",
+        "code": "MED-072",
+        "brand": "Medication 72",
+        "ingredient": "medication-72",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100074",
+        "code": "MED-074",
+        "brand": "Medication 74",
+        "ingredient": "medication-74",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100076",
+        "code": "MED-076",
+        "brand": "Medication 76",
+        "ingredient": "medication-76",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000100078",
+        "code": "MED-078",
+        "brand": "Medication 78",
+        "ingredient": "medication-78",
+        "drug_class": "General",
+        "in_stock": true,
+        "synthetic": true
+      }
+    ]
+  },
+  {
+    "table": "clinical.medication_catalog_allergens",
+    "rows": [
+      {
+        "medication_id": "12000000-0000-4000-8000-000000000001",
+        "allergen": "paracetamol"
+      },
+      {
+        "medication_id": "12000000-0000-4000-8000-000000000002",
+        "allergen": "amoxicillin"
+      },
+      {
+        "medication_id": "12000000-0000-4000-8000-000000000002",
+        "allergen": "penicillin"
+      },
+      {
+        "medication_id": "12000000-0000-4000-8000-000000000003",
+        "allergen": "sodium chloride"
+      },
+      {
+        "medication_id": "12000000-0000-4000-8000-000000000005",
+        "allergen": "Allergen 5"
+      },
+      {
+        "medication_id": "12000000-0000-4000-8000-000000000007",
+        "allergen": "Allergen 7"
+      },
+      {
+        "medication_id": "12000000-0000-4000-8000-000000000009",
+        "allergen": "Allergen 9"
+      }
+    ]
+  },
+  {
+    "table": "opd.diagnosis_catalog",
+    "rows": [
+      {
+        "code": "R50.9",
+        "description": "Fever, unspecified",
+        "synthetic": true
+      },
+      {
+        "code": "R51.9",
+        "description": "Headache, unspecified",
+        "synthetic": true
+      },
+      {
+        "code": "J06.9",
+        "description": "Acute upper respiratory infection, unspecified",
+        "synthetic": true
+      },
+      {
+        "code": "E11.9",
+        "description": "Type 2 diabetes mellitus without complications",
+        "synthetic": true
+      },
+      {
+        "code": "D4",
+        "description": "Diagnosis 4",
+        "synthetic": true
+      },
+      {
+        "code": "D6",
+        "description": "Diagnosis 6",
+        "synthetic": true
+      },
+      {
+        "code": "D8",
+        "description": "Diagnosis 8",
+        "synthetic": true
+      }
+    ]
+  },
+  {
+    "table": "opd.investigation_catalog",
+    "rows": [
+      {
+        "code": "CBC",
+        "name": "Complete blood count",
+        "price": "300.00",
+        "currency": "INR",
+        "synthetic": true
+      },
+      {
+        "code": "LFT",
+        "name": "Liver function test",
+        "price": "250.00",
+        "currency": "INR",
+        "synthetic": true
+      },
+      {
+        "code": "CXR",
+        "name": "Chest X-ray",
+        "price": "500.00",
+        "currency": "INR",
+        "synthetic": true
+      },
+      {
+        "code": "LAB3",
+        "name": "Investigation 3",
+        "price": "0.00",
+        "currency": "INR",
+        "synthetic": true
+      },
+      {
+        "code": "LAB5",
+        "name": "Investigation 5",
+        "price": "0.00",
+        "currency": "INR",
+        "synthetic": true
+      },
+      {
+        "code": "LAB7",
+        "name": "Investigation 7",
+        "price": "0.00",
+        "currency": "INR",
+        "synthetic": true
+      }
+    ]
+  },
+  {
+    "table": "forms.templates",
+    "rows": [
+      {
+        "id": "12000000-0000-4000-8000-000000000010",
+        "name": "General consent for admission and treatment",
+        "category": "Consent",
+        "created_by": "11000000-0000-4000-8000-000000000001"
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000500002",
+        "name": "Template 2",
+        "category": "generic"
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000500004",
+        "name": "Template 4",
+        "category": "generic"
+      }
+    ]
+  },
+  {
+    "table": "forms.template_versions",
+    "rows": [
+      {
+        "id": "12000000-0000-4000-8000-000000000011",
+        "template_id": "12000000-0000-4000-8000-000000000010",
+        "version": 1,
+        "fields": [
+          {
+            "key": "patient_name",
+            "label": "Patient name",
+            "type": "text",
+            "source": "name",
+            "required": true
+          },
+          {
+            "key": "uhid",
+            "label": "UHID",
+            "type": "text",
+            "source": "uhid",
+            "required": true
+          },
+          {
+            "key": "details",
+            "label": "Consent details",
+            "type": "long_text",
+            "required": true
+          },
+          {
+            "key": "doctor_signature",
+            "label": "Treating doctor",
+            "type": "signature",
+            "signer_role": "doctor",
+            "required": true
+          },
+          {
+            "key": "patient_signature",
+            "label": "Patient or guardian",
+            "type": "signature",
+            "signer_role": "patient",
+            "required": true
+          }
+        ],
+        "synthetic": true,
+        "created_by": "11000000-0000-4000-8000-000000000001"
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000600002",
+        "template_id": "12000000-0000-4000-8000-000000500002",
+        "version": 2,
+        "fields": [],
+        "created_by": "11000000-0000-4000-8000-000000000001"
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000600004",
+        "template_id": "12000000-0000-4000-8000-000000500004",
+        "version": 4,
+        "fields": [],
+        "created_by": "11000000-0000-4000-8000-000000000001"
+      }
+    ]
+  }
 ]
