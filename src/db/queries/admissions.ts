@@ -358,8 +358,13 @@ export function admissionAccessFilter(user: UserCtx) {
   if (user.job_role === 'administrator' || (!user.job_role && user.role === 'admin'))
     return db`TRUE`;
   return db`(
-    EXISTS (SELECT 1 FROM clinical.staff_assignments sa WHERE sa.admission_id = a.id AND sa.user_id = ${user.id} AND sa.ends_at IS NULL)
-    OR a.assigned_doctor_id = ${user.id}
+    EXISTS (
+      SELECT 1 FROM clinical.staff_assignments sa
+      WHERE sa.admission_id = a.id
+        AND sa.user_id = ${user.id}
+        AND sa.ends_at IS NULL
+        AND sa.assignment_type IN ('treating_consultant', 'duty_doctor')
+    )
     OR a.assigned_to = ${user.id}
     OR EXISTS (SELECT 1 FROM clinical.cross_referrals r WHERE r.admission_id = a.id AND r.consultant_id = ${user.id} AND r.status IN ('sent','seen','opinion','acknowledged'))
     OR (${user.role === 'doctor'} AND a.assigned_doctor_id IS NULL AND ${activeShiftUnitFilter(user.id)})
@@ -393,8 +398,13 @@ export function listAdmissionsForUser(
 
   if (user.role === 'doctor' && scope !== 'open') {
     const assigned = db`(
-      a.assigned_doctor_id = ${user.id}
-      OR EXISTS (SELECT 1 FROM clinical.staff_assignments sa WHERE sa.admission_id = a.id AND sa.user_id = ${user.id} AND sa.ends_at IS NULL)
+      EXISTS (
+        SELECT 1 FROM clinical.staff_assignments sa
+        WHERE sa.admission_id = a.id
+          AND sa.user_id = ${user.id}
+          AND sa.ends_at IS NULL
+          AND sa.assignment_type IN ('treating_consultant', 'duty_doctor')
+      )
       OR EXISTS (SELECT 1 FROM clinical.cross_referrals r WHERE r.admission_id = a.id AND r.consultant_id = ${user.id} AND r.status IN ('sent','seen','opinion','acknowledged'))
     )`;
     if (ward) {
