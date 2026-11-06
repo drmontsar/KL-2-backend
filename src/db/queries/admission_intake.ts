@@ -142,19 +142,30 @@ export async function confirmPatientInBed(id: string, actor_user_id: string) {
       UPDATE clinical.admissions a
       SET arrival_status = 'admitted', arrived_at = now(), revision = a.revision + 1
       FROM staff.users u
-      WHERE a.id = ${id} AND a.status = 'active' AND a.arrival_status = 'incoming'
-        AND a.assigned_to = ${actor_user_id} AND u.id = ${actor_user_id}
-        AND u.job_role = 'staff_nurse' AND u.disabled_at IS NULL
+      WHERE a.id = ${id} AND a.status = 'active'
+        AND EXISTS (SELECT 1 FROM clinical.admission_checklist_items i WHERE i.admission_id = a.id AND i.code = 'unit_arrival' AND i.status = 'pending')
+        AND (
+          a.arrival_status = 'incoming'
+          OR (
+            a.arrival_status = 'admitted' AND a.assigned_to IS NULL AND a.arrived_at = a.admitted_at
+            AND EXISTS (SELECT 1 FROM clinical.admission_requests r WHERE r.admission_id = a.id)
+            AND EXISTS (SELECT 1 FROM clinical.admission_checklist_items i WHERE i.admission_id = a.id AND i.code = 'doctor_assessment' AND i.status = 'pending')
+          )
+        )
+        AND u.id = ${actor_user_id} AND u.disabled_at IS NULL
+        AND (u.job_role = 'duty_doctor' OR (u.job_role = 'staff_nurse' AND a.assigned_to = ${actor_user_id}))
       RETURNING a.*
     `;
     if (!admission) return null;
     await tx`
       UPDATE clinical.admission_checklist_items
-      SET status = 'completed', completed_by = ${actor_user_id}, completed_at = now(), evidence = 'Patient confirmed in bed'
+      SET status = 'completed', completed_by = ${actor_user_id}, completed_at = now(),
+          evidence = CASE WHEN ${admission.assigned_to} = ${actor_user_id} THEN 'Patient confirmed in bed by assigned nurse' ELSE 'Patient confirmed in bed by duty doctor' END
       WHERE admission_id = ${id} AND code = 'unit_arrival' AND status = 'pending'
     `;
     await tx`INSERT INTO clinical.observation_schedules (admission_id, frequency_minutes, next_due_at, source, policy_version, updated_by)
-      VALUES (${id}, 720, now(), 'news2_policy', 'NEWS2-2017-scale-1', ${actor_user_id})`;
+      SELECT ${id}, 720, now(), 'news2_policy', 'NEWS2-2017-scale-1', ${actor_user_id}
+      WHERE NOT EXISTS (SELECT 1 FROM clinical.observation_schedules WHERE admission_id = ${id})`;
     await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after)
       VALUES (${actor_user_id}, 'confirm_in_bed', 'clinical.admissions', ${id}, ${tx.json(admission as unknown as Json)})`;
     return admission;
