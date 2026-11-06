@@ -206,17 +206,18 @@ admissionIntakeRouter.openapi(
     tags: ['Admission Intake'],
     request: { params: IdParam },
     responses: {
-      200: { content: { 'application/json': { schema: AdmissionSchema } }, description: 'Assigned nurse confirmed patient in bed' },
-      403: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Nurse access required' },
-      409: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Patient not incoming or not assigned to this nurse' },
+      200: { content: { 'application/json': { schema: AdmissionSchema } }, description: 'Assigned nurse or duty doctor confirmed patient in bed' },
+      403: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Assigned nurse or duty doctor access required' },
+      409: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Arrival already confirmed, admission not eligible, or nurse not assigned'  },
     },
   }),
   async (c) => {
     const user = c.get('user');
-    if (user.job_role !== 'staff_nurse') return c.json({ error: 'nurse access required' }, 403);
+    if (user.job_role !== 'staff_nurse' && user.job_role !== 'duty_doctor')
+      return c.json({ error: 'assigned nurse or duty doctor access required' }, 403);
     const { id } = c.req.valid('param');
     const admission = await confirmPatientInBed(id, user.id);
-    if (!admission) return c.json({ error: 'patient not incoming or not assigned to this nurse' }, 409);
+    if (!admission) return c.json({ error: 'arrival already confirmed, admission not eligible, or nurse not assigned' }, 409);
     return c.json(admission, 200);
   },
 );

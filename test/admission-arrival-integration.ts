@@ -73,7 +73,7 @@ try {
   const otherNurseToken = await createSession(otherNurse.id);
   const endpoint = `/admissions/${admission!.id}/confirm-in-bed`;
   const post = (token: string, path = endpoint) => app.request(path, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-  assert((await post(adminToken)).status === 403, 'Non-nurse must not check in patient');
+  assert((await post(adminToken)).status === 403, 'Administrator must not check in patient');
   assert((await post(otherNurseToken)).status === 409, 'Another nurse must not check in patient');
   const [arrival] = await db<{ id: string }[]>`SELECT id FROM clinical.admission_checklist_items WHERE admission_id = ${admission!.id} AND code = 'unit_arrival'`;
   assert((await app.request(`/admission-checklist/${arrival.id}/complete`, {
@@ -117,6 +117,60 @@ try {
   `;
   assert(after.status === 'completed' && after.arrival_status === 'admitted' && after.arrived_at && after.schedule_count === 1,
     'Check-in must complete checklist and start clinical observations');
+
+  // A duty doctor can manually confirm a different incoming patient, without
+  // taking the assigned nurse's ownership or bypassing the same atomic steps.
+  const [secondBed] = await db<{ id: string; unit_id: string }[]>`
+    SELECT b.id, w.unit_id FROM organization.beds b
+    JOIN organization.rooms r ON r.id = b.room_id JOIN organization.wards w ON w.id = r.ward_id
+    WHERE b.operational_state = 'available' AND b.id <> ${bed.id}
+      AND NOT EXISTS (SELECT 1 FROM clinical.admissions a WHERE a.bed_id = b.id AND a.status = 'active')
+      AND NOT EXISTS (SELECT 1 FROM organization.bed_reservations r WHERE r.bed_id = b.id AND r.released_at IS NULL) LIMIT 1
+  `;
+  assert(secondBed, 'Seed must contain a second free bed for doctor check-in');
+  const [secondPatient] = await db<{ id: string }[]>`
+    INSERT INTO clinical.patients (name, dob, created_by) VALUES ('Doctor arrival confirmation', '1992-01-01', ${admin.id}) RETURNING id
+  `;
+  const [secondRequest] = await db<{ id: string }[]>`
+    INSERT INTO clinical.admission_requests (patient_id, source, diagnosis, requested_unit_id, requested_by)
+    VALUES (${secondPatient.id}, 'elective', 'Arrival check', ${secondBed.unit_id}, ${admin.id}) RETURNING id
+  `;
+  const second = await acceptAdmissionRequest({ bed_id: secondBed.id, consultant_id: consultant.id, nurse_id: nurse.id }, secondRequest.id, admin.id);
+  assert(second?.admission.arrival_status === 'incoming', 'Second admission must be incoming');
+  const doctorEndpoint = `/admissions/${second!.admission.id}/confirm-in-bed`;
+  const doctorCheckIn = await post(doctorToken, doctorEndpoint);
+  assert(doctorCheckIn.status === 200 && (await doctorCheckIn.json()).arrival_status === 'admitted', 'Duty doctor must be able to manually admit incoming patient');
+  assert((await post(doctorToken, doctorEndpoint)).status === 409, 'Repeated doctor check-in must be rejected');
+  assert((await post(otherNurseToken, doctorEndpoint)).status === 409, 'Wrong nurse must not override doctor check-in');
+  const [doctorArrival] = await db<{ completed_by: string; evidence: string; schedule_count: number; assigned_to: string }[]>`
+    SELECT c.completed_by, c.evidence, a.assigned_to,
+      (SELECT count(*)::int FROM clinical.observation_schedules WHERE admission_id = a.id) AS schedule_count
+    FROM clinical.admissions a JOIN clinical.admission_checklist_items c ON c.admission_id = a.id AND c.code = 'unit_arrival'
+    WHERE a.id = ${second!.admission.id}
+  `;
+  assert(doctorArrival.completed_by === doctor.id && doctorArrival.evidence.includes('duty doctor')
+    && doctorArrival.assigned_to === nurse.id && doctorArrival.schedule_count === 1,
+    'Manual check-in must audit doctor without reassigning nurse or skipping observation scheduling');
+
+  // Old request-created admissions could already say "admitted" even though
+  // their arrival and doctor checklist steps were still pending. Recovery must
+  // require explicit confirmation and must not create a second schedule.
+  await db`UPDATE clinical.admissions SET assigned_to = NULL, arrived_at = admitted_at
+    WHERE id = ${second!.admission.id}`;
+  await db`UPDATE clinical.admission_checklist_items SET status = 'pending', completed_by = NULL,
+    completed_at = NULL, evidence = NULL WHERE admission_id = ${second!.admission.id} AND code = 'unit_arrival'`;
+  const legacyConfirm = await post(doctorToken, doctorEndpoint);
+  assert(legacyConfirm.status === 200, 'Duty doctor must be able to confirm a legacy unconfirmed arrival');
+  const [legacyResult] = await db<{ schedule_count: number; arrival_status: string; arrival_step: string; completed_by: string }[]>`
+    SELECT a.arrival_status, c.status AS arrival_step, c.completed_by,
+      (SELECT count(*)::int FROM clinical.observation_schedules WHERE admission_id = a.id) AS schedule_count
+    FROM clinical.admissions a JOIN clinical.admission_checklist_items c ON c.admission_id = a.id AND c.code = 'unit_arrival'
+    WHERE a.id = ${second!.admission.id}
+  `;
+  assert(legacyResult.arrival_status === 'admitted' && legacyResult.arrival_step === 'completed'
+    && legacyResult.completed_by === doctor.id && legacyResult.schedule_count === 1,
+    'Recovery must complete arrival and retain the existing observation schedule');
+  assert((await post(doctorToken, doctorEndpoint)).status === 409, 'Recovered arrival cannot be confirmed twice');
   console.log('Admission arrival workflow integration passed');
 } finally {
   await db.end();
