@@ -6,6 +6,7 @@ import type { User } from './db/queries/users';
 import { authMiddleware } from './middleware/auth';
 import { handleError, requestLogging } from './middleware/request_logging';
 import { admissionIntakeRouter } from './routes/admission_intake';
+import { initialAssessmentsRouter } from './routes/initial_assessments';
 import { admissionsRouter } from './routes/admissions';
 import { analyticsRouter } from './routes/analytics';
 import { authRouter } from './routes/auth';
@@ -72,6 +73,7 @@ export function makeApp() {
   app.route('/', staffScopeRouter);
   app.route('/', patientIdentityRouter);
   app.route('/', admissionIntakeRouter);
+  app.route('/', initialAssessmentsRouter);
   app.route('/', nursingRouter);
   app.route('/', nursingCarePlanRouter);
   app.route('/', medicationAdministrationRouter);

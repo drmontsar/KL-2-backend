@@ -279,6 +279,8 @@ admissionIntakeRouter.openapi(
       return c.json({ error: 'not found or forbidden' }, 403);
     if (item.code === 'unit_arrival')
       return c.json({ error: 'use confirm-in-bed to complete unit arrival' }, 409);
+    if (item.code === 'doctor_assessment')
+      return c.json({ error: 'submit an initial assessment to complete this step' }, 409);
     const permitted =
       user.job_role === 'administrator' ||
       (item.code === 'nursing_assessment'
