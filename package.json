@@ -7,6 +7,7 @@
     "server": "bun run src/main.ts",
     "migrate": "bun run src/db/migrate.ts",
     "seed": "bun run src/db/seed-test-data.ts",
+    "seed:care-area": "bun run src/db/seed-care-area.ts",
     "reset:demo": "bun run src/db/seed-test-data.ts --reset",
     "assign:test-user": "bun run src/db/assign-test-user.ts",
     "check": "tsc --noEmit",

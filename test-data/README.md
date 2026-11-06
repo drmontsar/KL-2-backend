@@ -25,6 +25,8 @@ bun run seed
 
 `bun run seed` applies the migrations before loading the files. It is limited to a local, non-production PostgreSQL database named `klinik` using the `klinik` database user. It inserts missing records in one transaction, tracks their IDs, rejects collisions with unrelated records, and never overwrites an existing row.
 
+For an additional inpatient **Care Area** ward with 100 free beds (`CA-001`–`CA-100`) and three fictional consultants, run `bun run seed:care-area` after `bun run seed`. It is idempotent and local-only; re-run it after `reset:demo` if you want these optional additions back. Demo consultant phones: Dr. Mira Kapoor `+1 202 555 0161`, Dr. Farhan Ali `+1 202 555 0162`, Dr. Leena Nair `+1 202 555 0163`.
+
 ## Replace mixed or outdated data
 
 Stop the API, then run:
