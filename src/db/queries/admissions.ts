@@ -6,6 +6,8 @@ export type Admission = {
   id: string;
   patient_id: string;
   status: 'active' | 'discharged';
+  arrival_status: 'incoming' | 'admitted';
+  arrived_at: Date | null;
   severity: 'unstable' | 'watcher' | 'stable';
   ward: string | null;
   bed: string | null;

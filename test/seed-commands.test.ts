@@ -3,11 +3,9 @@ import { fileURLToPath } from 'node:url';
 import { scripts } from '../package.json';
 import staff from '../test-data/staff.json';
 
-test('demo setup has a single seed command', () => {
-  expect(
-    Object.keys(scripts).filter((name) => name === 'seed' || name.startsWith('seed:')),
-  ).toEqual(['seed']);
+test('demo setup keeps the baseline seed separate from optional Care Area data', () => {
   expect(scripts.seed).toBe('bun run src/db/seed-test-data.ts');
+  expect(scripts['seed:care-area']).toBe('bun run src/db/seed-care-area.ts');
 });
 
 test('demo reset reuses the fixture loader with an explicit destructive flag', () => {

@@ -64,6 +64,7 @@ const CensusEntrySchema = BedSchema.extend({
   severity: z.enum(['unstable', 'watcher', 'stable']),
   assigned_doctor_id: z.string().uuid().nullable(),
   assigned_to: z.string().uuid().nullable(),
+  arrival_status: z.enum(['incoming', 'admitted']),
 });
 
 const FacilityQuery = z.object({ facility_id: z.string().uuid().optional() });

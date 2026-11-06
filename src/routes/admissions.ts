@@ -2,10 +2,9 @@ import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from 'zod';
 import { hasPermission } from '../authorization';
 import { UpdateDraftBody } from '../contracts/notes';
-import { canAccessPatient, canAccessResource } from '../db/queries/access';
+import { canAccessResource } from '../db/queries/access';
 import {
   assignAdmission,
-  createAdmission,
   dischargeAdmission,
   getAdmissionForUser,
   listAdmissionsForUser,
@@ -157,11 +156,11 @@ admissionsRouter.openapi(
       },
       201: {
         content: { 'application/json': { schema: AdmissionSchema } },
-        description: 'Admission created',
+        description: 'Legacy response; use admission intake instead',
       },
       409: {
         content: { 'application/json': { schema: ErrorSchema } },
-        description: 'Selected bed is unavailable',
+        description: 'Use admission request acceptance to assign a nurse and consultant',
       },
     },
   }),
@@ -169,13 +168,7 @@ admissionsRouter.openapi(
     const user = c.get('user');
     if (!hasPermission(user, 'admissions.manage'))
       return c.json({ error: 'admission-management access required' }, 403);
-    const data = c.req.valid('json');
-    if (!(await canAccessPatient(user, data.patient_id)))
-      return c.json({ error: 'patient not found or forbidden' }, 403);
-
-    const admission = await createAdmission({ ...data, created_by: user.id });
-    if (!admission) return c.json({ error: 'selected bed is unavailable' }, 409);
-    return c.json(admission, 201);
+    return c.json({ error: 'create an admission request and accept it with a consultant, nurse and bed' }, 409);
   },
 );
 
