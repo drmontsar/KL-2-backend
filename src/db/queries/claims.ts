@@ -62,7 +62,7 @@ export async function listClaims(user: User) {
     SELECT f.* FROM finance.claims f JOIN clinical.admissions a ON a.id = f.admission_id
     WHERE ${user.job_role === 'administrator'}
       OR (${user.job_role === 'billing_insurance'} AND EXISTS (SELECT 1 FROM staff.unit_memberships m WHERE m.user_id = ${user.id} AND m.unit_id = a.unit_id))
-      OR (${user.role === 'doctor'} AND (a.assigned_doctor_id = ${user.id} OR EXISTS (SELECT 1 FROM clinical.staff_assignments sa WHERE sa.admission_id = a.id AND sa.user_id = ${user.id} AND sa.ends_at IS NULL)))
+      OR (${user.job_role === 'duty_doctor'} OR (${user.role === 'doctor'} AND EXISTS (SELECT 1 FROM clinical.staff_assignments sa WHERE sa.admission_id = a.id AND sa.user_id = ${user.id} AND sa.ends_at IS NULL)))
     ORDER BY f.updated_at DESC LIMIT 200
   `.catch(rethrowDatabaseError);
 }

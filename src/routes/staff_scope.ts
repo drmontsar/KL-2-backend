@@ -67,7 +67,7 @@ const AssignmentSchema = z.object({
 });
 const AssignmentBody = z.object({
   user_id: z.string().uuid(),
-  assignment_type: z.enum(['treating_consultant', 'duty_doctor', 'primary_nurse', 'coverage']),
+  assignment_type: z.enum(['treating_consultant', 'primary_nurse', 'coverage']),
 });
 const BreakGlassBody = z.object({ reason: z.string().trim().min(10).max(500) });
 const BreakGlassSchema = z.object({ id: z.string().uuid(), expires_at: z.string() });

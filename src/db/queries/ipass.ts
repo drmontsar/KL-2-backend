@@ -19,7 +19,7 @@ export async function createIpassSession(body: CreateBodyInput, actor_user_id: s
         await tx`SELECT id FROM staff.users WHERE id = ${body.incoming_doctor_id} AND role = 'doctor' AND disabled_at IS NULL`;
       if (!incoming) return null;
       const admissions = await tx<{ id: string }[]>`
-        SELECT id FROM clinical.admissions WHERE assigned_doctor_id = ${actor_user_id} AND status = 'active'
+        SELECT id FROM clinical.admissions WHERE status = 'active'
           AND (${body.ward ?? null}::text IS NULL OR ward = ${body.ward ?? null}::text) ORDER BY id FOR UPDATE
       `;
       if (!admissions.length) return null;
@@ -78,7 +78,7 @@ export async function updateIpassItem(body: ItemBodyInput, id: string, actor_use
         severity = a.severity, snapshot_revision = a.revision, ward = a.ward, bed = a.bed, status = 'draft', signed_at = NULL
       FROM clinical.ipass_sessions s, clinical.admissions a
       WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'draft' AND s.outgoing_doctor_id = ${actor_user_id}
-        AND a.id = i.admission_id AND a.status = 'active' AND a.assigned_doctor_id = ${actor_user_id} RETURNING i.*
+        AND a.id = i.admission_id AND a.status = 'active' RETURNING i.*
     `;
       if (item)
         await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'update', 'clinical.ipass_items', ${id}, ${tx.json(item as unknown as Json)})`;
@@ -94,7 +94,7 @@ export async function signIpassItem(id: string, actor_user_id: string) {
       UPDATE clinical.ipass_items i SET status = 'signed', signed_at = now()
       FROM clinical.ipass_sessions s, clinical.admissions a
       WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'draft' AND s.outgoing_doctor_id = ${actor_user_id}
-        AND i.status = 'draft' AND a.id = i.admission_id AND a.status = 'active' AND a.assigned_doctor_id = ${actor_user_id}
+        AND i.status = 'draft' AND a.id = i.admission_id AND a.status = 'active'
         AND a.revision = i.snapshot_revision AND length(trim(i.patient_summary)) > 0 AND length(trim(i.action_list)) > 0 AND length(trim(i.contingency)) > 0 RETURNING i.*
     `;
       if (item)
@@ -119,7 +119,7 @@ export async function sendIpassSession(id: string, actor_user_id: string) {
       if (!session) return null;
       const [invalid] = await tx`
       SELECT i.id FROM clinical.ipass_items i JOIN clinical.admissions a ON a.id = i.admission_id
-      WHERE i.session_id = ${id} AND (i.status <> 'signed' OR a.status <> 'active' OR a.assigned_doctor_id IS DISTINCT FROM ${actor_user_id}::uuid OR a.revision <> i.snapshot_revision)
+      WHERE i.session_id = ${id} AND (i.status <> 'signed' OR a.status <> 'active' OR a.revision <> i.snapshot_revision)
       LIMIT 1
     `;
       if (invalid) return null;
@@ -157,17 +157,15 @@ export async function acceptIpassItem(
     `;
       if (!item || (item.severity !== 'stable' && !readback)) return null;
       const [admission] = await tx<{ id: string }[]>`
-      UPDATE clinical.admissions SET assigned_doctor_id = ${actor_user_id}, revision = revision + 1
-      WHERE id = ${item.admission_id} AND status = 'active' AND assigned_doctor_id = ${item.outgoing_doctor_id}
+      SELECT id FROM clinical.admissions
+      WHERE id = ${item.admission_id} AND status = 'active'
         AND revision = ${item.snapshot_revision}
         AND NOT EXISTS (SELECT 1 FROM clinical.vitals v WHERE v.admission_id = ${item.admission_id} AND v.recorded_at > ${item.signed_at}::timestamptz)
         AND NOT EXISTS (SELECT 1 FROM clinical.notes n WHERE n.admission_id = ${item.admission_id} AND n.created_at > ${item.signed_at}::timestamptz)
         AND NOT EXISTS (SELECT 1 FROM clinical.orders o WHERE o.admission_id = ${item.admission_id} AND (o.created_at > ${item.signed_at}::timestamptz OR o.confirmed_at > ${item.signed_at}::timestamptz))
-      RETURNING id
+      FOR UPDATE
     `;
       if (!admission) return null;
-      await tx`UPDATE clinical.staff_assignments SET ends_at = now() WHERE admission_id = ${item.admission_id} AND user_id = ${item.outgoing_doctor_id} AND assignment_type = 'duty_doctor' AND ends_at IS NULL`;
-      await tx`INSERT INTO clinical.staff_assignments (admission_id, user_id, assignment_type, assigned_by) VALUES (${item.admission_id}, ${actor_user_id}, 'duty_doctor', ${actor_user_id}) ON CONFLICT DO NOTHING`;
       const [updated] = await tx<
         Item[]
       >`UPDATE clinical.ipass_items SET status = 'accepted', readback = ${readback ?? null}, accepted_at = now() WHERE id = ${id} RETURNING *`;
@@ -176,7 +174,6 @@ export async function acceptIpassItem(
         await tx`SELECT id FROM clinical.ipass_items WHERE session_id = ${item.session_id} AND status <> 'accepted' LIMIT 1`;
       if (!remaining) {
         await tx`UPDATE clinical.ipass_sessions SET status = 'completed', completed_at = now() WHERE id = ${item.session_id}`;
-        await tx`UPDATE staff.shifts SET status = 'completed' WHERE user_id = ${item.outgoing_doctor_id} AND status = 'active' AND NOT EXISTS (SELECT 1 FROM clinical.admissions WHERE status = 'active' AND assigned_doctor_id = ${item.outgoing_doctor_id})`;
       }
       const [notification] = await tx<
         { id: string; type: string; payload: Json; created_at: Date }[]
@@ -228,7 +225,7 @@ export async function refreshIpassItem(body: ItemBodyInput, id: string, actor_us
         severity = a.severity, snapshot_revision = a.revision, ward = a.ward, bed = a.bed, signed_at = now()
       FROM clinical.ipass_sessions s, clinical.admissions a
       WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'sent' AND s.outgoing_doctor_id = ${actor_user_id} AND i.status = 'signed'
-        AND a.id = i.admission_id AND a.status = 'active' AND a.assigned_doctor_id = ${actor_user_id}
+        AND a.id = i.admission_id AND a.status = 'active'
       RETURNING i.*, s.incoming_doctor_id
     `;
       if (!item) return null;
