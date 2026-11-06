@@ -15,7 +15,6 @@ import {
   addIpassQuestion,
   cancelIpassSession,
   createIpassSession,
-  getIncomingIpassItemOwner,
   getIpassSession,
   getIpassSessionById,
   getIpassSessionForItem,
@@ -36,6 +35,12 @@ type Variables = { user: User };
 
 export const ipassRouter = new OpenAPIHono<{ Variables: Variables }>();
 
+ipassRouter.use('*', async (c, next) => {
+  if (c.get('user').job_role !== 'duty_doctor')
+    return c.json({ error: 'duty doctor access required' }, 403);
+  await next();
+});
+
 ipassRouter.openapi(
   createRoute({
     method: 'post',
@@ -53,7 +58,7 @@ ipassRouter.openapi(
       },
       409: {
         content: { 'application/json': { schema: ErrorSchema } },
-        description: 'Recipient unavailable, no assigned patients, or another handover is open',
+        description: 'No admitted patients in the selected ward, or another handover is open',
       },
     },
   }),
@@ -61,11 +66,9 @@ ipassRouter.openapi(
     const user = c.get('user');
     const body = c.req.valid('json');
     if (user.role !== 'doctor') return c.json({ error: 'doctor access required' }, 403);
-    if (user.id === body.incoming_doctor_id)
-      return c.json({ error: 'recipient must be another doctor' }, 409);
 
     const result = await createIpassSession(body, user.id);
-    if (!result) return c.json({ error: 'recipient unavailable or no assigned patients' }, 409);
+    if (!result) return c.json({ error: 'no admitted patients to hand over' }, 409);
     return c.json(result, 201);
   },
 );
@@ -132,7 +135,7 @@ ipassRouter.openapi(
       },
       409: {
         content: { 'application/json': { schema: ErrorSchema } },
-        description: 'Session no longer editable or patient ownership changed',
+        description: 'Session no longer editable or patient is no longer available',
       },
     },
   }),
@@ -145,7 +148,7 @@ ipassRouter.openapi(
       return c.json({ error: 'not found or forbidden' }, 403);
     const row = await updateIpassItem(body, id, user.id);
     if (!row)
-      return c.json({ error: 'session no longer editable or patient ownership changed' }, 409);
+      return c.json({ error: 'session no longer editable or patient is no longer available' }, 409);
     return c.json(row, 200);
   },
 );
@@ -222,7 +225,7 @@ ipassRouter.openapi(
     responses: {
       200: {
         content: { 'application/json': { schema: ItemSchema } },
-        description: 'Responsibility transferred',
+        description: 'Patient reviewed by a duty doctor; no ownership transfer',
       },
       403: {
         content: { 'application/json': { schema: ErrorSchema } },
@@ -230,20 +233,17 @@ ipassRouter.openapi(
       },
       409: {
         content: { 'application/json': { schema: ErrorSchema } },
-        description: 'Read-back required, item stale, or responsibility changed',
+        description: 'Receiver view/read-back required, item stale, or already reviewed',
       },
     },
   }),
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const { readback } = c.req.valid('json');
-    const [owner] = await getIncomingIpassItemOwner(id);
-    if (!owner || owner.incoming_doctor_id !== user.id)
-      return c.json({ error: 'not found or forbidden' }, 403);
-    const result = await acceptIpassItem(id, user.id, readback);
+    const { receiver_view, readback, acknowledge_stale } = c.req.valid('json');
+    const result = await acceptIpassItem(id, user.id, receiver_view, readback, acknowledge_stale);
     if (!result)
-      return c.json({ error: 'read-back required, item stale, or responsibility changed' }, 409);
+      return c.json({ error: 'receiver view/read-back required, item stale (set acknowledge_stale after reviewing changes), or already reviewed' }, 409);
     return c.json(result, 200);
   },
 );
@@ -277,10 +277,7 @@ ipassRouter.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const [session] = await getIpassSessionForItem(id);
-    if (
-      !session ||
-      (session.incoming_doctor_id !== user.id && session.outgoing_doctor_id !== user.id)
-    )
+    if (!session || (session.status === 'draft' && session.outgoing_doctor_id !== user.id))
       return c.json({ error: 'not found or forbidden' }, 403);
     const result = await addIpassQuestion(id, user.id, body);
     if (!result) return c.json({ error: 'handover not active' }, 409);
@@ -305,7 +302,7 @@ ipassRouter.openapi(
       },
       409: {
         content: { 'application/json': { schema: ErrorSchema } },
-        description: 'Item unavailable or patient ownership changed',
+        description: 'Item unavailable or patient no longer admitted',
       },
     },
   }),
@@ -317,7 +314,7 @@ ipassRouter.openapi(
     if (!owner || owner.outgoing_doctor_id !== user.id)
       return c.json({ error: 'not found or forbidden' }, 403);
     const result = await refreshIpassItem(body, id, user.id);
-    if (!result) return c.json({ error: 'item unavailable or patient ownership changed' }, 409);
+    if (!result) return c.json({ error: 'item unavailable or patient no longer admitted' }, 409);
     return c.json(result, 200);
   },
 );
@@ -343,11 +340,7 @@ ipassRouter.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const [session] = await getIpassSessionForItem(id);
-    if (
-      !session ||
-      (session.incoming_doctor_id !== user.id && session.outgoing_doctor_id !== user.id) ||
-      (session.status === 'draft' && session.incoming_doctor_id === user.id)
-    )
+    if (!session || (session.status === 'draft' && session.outgoing_doctor_id !== user.id))
       return c.json({ error: 'not found or forbidden' }, 403);
     return c.json(await listIpassQuestions(id), 200);
   },
@@ -362,7 +355,7 @@ ipassRouter.openapi(
     responses: {
       200: {
         content: { 'application/json': { schema: SessionSchema } },
-        description: 'Remaining handover items cancelled; accepted assignments remain transferred',
+        description: 'Remaining handover items cancelled; previously reviewed items remain recorded',
       },
       403: {
         content: { 'application/json': { schema: ErrorSchema } },

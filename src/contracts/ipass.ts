@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const SessionSchema = z.object({
   id: z.string().uuid(),
   outgoing_doctor_id: z.string().uuid(),
-  incoming_doctor_id: z.string().uuid(),
+  incoming_doctor_id: z.string().uuid().nullable(),
+  ward: z.string().nullable(),
   status: z.enum(['draft', 'sent', 'completed', 'cancelled']),
   created_at: z.string(),
   sent_at: z.string().nullable(),
@@ -18,6 +19,7 @@ export const ItemSchema = z.object({
   ward: z.string().nullable(),
   bed: z.string().nullable(),
   severity: z.enum(['stable', 'watcher', 'unstable']),
+  arrival_status: z.enum(['incoming', 'admitted']),
   patient_summary: z.string(),
   action_list: z.string(),
   contingency: z.string(),
@@ -25,6 +27,9 @@ export const ItemSchema = z.object({
   snapshot_revision: z.union([z.string(), z.number()]),
   signed_at: z.string().nullable(),
   readback: z.string().nullable(),
+  receiver_view: z.string().nullable(),
+  stale_acknowledged: z.boolean(),
+  reviewed_by: z.string().uuid().nullable(),
   accepted_at: z.string().nullable(),
 });
 
@@ -39,7 +44,6 @@ export const QuestionSchema = z.object({
 });
 
 export const CreateBody = z.object({
-  incoming_doctor_id: z.string().uuid(),
   ward: z.string().trim().min(1).optional(),
 });
 
@@ -49,7 +53,11 @@ export const ItemBody = z.object({
   contingency: z.string().trim().min(1).max(10000),
 });
 
-export const AcceptBody = z.object({ readback: z.string().trim().max(10000).optional() });
+export const AcceptBody = z.object({
+  receiver_view: z.string().trim().min(1).max(10000),
+  readback: z.string().trim().min(1).max(10000).optional(),
+  acknowledge_stale: z.boolean().optional(),
+});
 
 export const QuestionBody = z.object({ body: z.string().trim().min(1).max(5000) });
 
