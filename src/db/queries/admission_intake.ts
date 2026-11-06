@@ -184,7 +184,7 @@ export async function completeAdmissionChecklistItem(
     .begin(async (tx) => {
       const [row] = await tx<ChecklistItem[]>`
       UPDATE clinical.admission_checklist_items i SET status = 'completed', completed_by = ${actor_user_id}, completed_at = now(), evidence = ${evidence}
-      FROM clinical.admissions a WHERE i.id = ${id} AND i.admission_id = a.id AND a.status = 'active' AND i.status = 'pending' AND i.code <> 'unit_arrival' RETURNING i.*
+      FROM clinical.admissions a WHERE i.id = ${id} AND i.admission_id = a.id AND a.status = 'active' AND i.status = 'pending' AND i.code NOT IN ('unit_arrival', 'doctor_assessment') RETURNING i.*
     `;
       if (row)
         await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'complete', 'clinical.admission_checklist_items', ${id}, ${tx.json(row as unknown as Json)})`;

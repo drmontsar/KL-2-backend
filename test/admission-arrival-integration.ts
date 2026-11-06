@@ -40,6 +40,26 @@ try {
 
   const nurseToken = await createSession(nurse.id);
   const adminToken = await createSession(admin.id);
+  const [doctor] = await db<{ id: string }[]>`SELECT id FROM staff.users WHERE job_role = 'duty_doctor' AND disabled_at IS NULL LIMIT 1`;
+  assert(doctor, 'Seed must contain a duty doctor');
+  const doctorToken = await createSession(doctor.id);
+  const assessmentPath = `/admissions/${admission!.id}/initial-assessment`;
+  const assessmentBody = {
+    chief_complaint: 'Shortness of breath', history: 'Two days of worsening dyspnea',
+    examination: 'Tachypneic, bilateral crackles', clinical_impression: 'Possible pneumonia',
+    plan: 'Obtain chest radiograph and monitor oxygen saturation',
+  };
+  const submitAssessment = (token: string) => app.request(assessmentPath, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(assessmentBody),
+  });
+  const required = async () => {
+    const response = await app.request('/admissions/initial-assessment-required', { headers: { Authorization: `Bearer ${doctorToken}` } });
+    assert(response.status === 200, 'Duty-doctor assessment queue must load');
+    return (await response.json() as { id: string }[]).some((row) => row.id === admission!.id);
+  };
+  assert(!(await required()), 'Incoming patient must not enter the doctor assessment queue yet');
+  assert((await submitAssessment(doctorToken)).status === 409, 'Initial assessment must wait for nurse check-in');
   assert((await app.request('/admissions', {
     method: 'POST', headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ patient_id: patient.id, bed_id: bed.id }),
@@ -64,6 +84,31 @@ try {
   assert(checkedIn.status === 200 && (await checkedIn.json()).arrival_status === 'admitted', 'Assigned nurse must be able to check in');
   assert((await post(nurseToken)).status === 409, 'Check-in must be idempotent');
   assert((await bedOccupancy()) === 'occupied', 'Checked-in bed should be occupied');
+  assert(await required(), 'Newly admitted patient should require initial assessment');
+  const [doctorChecklist] = await db<{ id: string }[]>`SELECT id FROM clinical.admission_checklist_items WHERE admission_id = ${admission!.id} AND code = 'doctor_assessment'`;
+  assert((await app.request(`/admission-checklist/${doctorChecklist.id}/complete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${doctorToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ evidence: 'without assessment' }),
+  })).status === 409, 'Doctor assessment cannot be checked off without recording it');
+  assert((await submitAssessment(nurseToken)).status === 403, 'Nurse must not sign doctor assessment');
+  const incomplete = await app.request(assessmentPath, {
+    method: 'POST', headers: { Authorization: `Bearer ${doctorToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...assessmentBody, examination: ' ' }),
+  });
+  assert(incomplete.status === 400, 'Empty examination must not complete assessment');
+  const signed = await submitAssessment(doctorToken);
+  assert(signed.status === 201 && (await signed.json()).clinical_impression === assessmentBody.clinical_impression,
+    'Duty doctor must be able to sign structured assessment');
+  assert((await submitAssessment(doctorToken)).status === 409, 'Assessment should only be signed once');
+  assert(!(await required()), 'Signed assessment must leave the queue');
+  const [completedAssessment] = await db<{ status: string; completed_by: string }[]>`
+    SELECT status, completed_by FROM clinical.admission_checklist_items WHERE id = ${doctorChecklist.id}
+  `;
+  assert(completedAssessment.status === 'completed' && completedAssessment.completed_by === doctor.id,
+    'Signing must complete the doctor checklist atomically');
+  const stored = await app.request(assessmentPath, { headers: { Authorization: `Bearer ${nurseToken}` } });
+  assert(stored.status === 200 && (await stored.json()).chief_complaint === assessmentBody.chief_complaint,
+    'Assigned nurse should be able to read signed assessment');
   const [after] = await db<{ status: string; arrival_status: string; arrived_at: Date; schedule_count: number }[]>`
     SELECT c.status, a.arrival_status, a.arrived_at,
       (SELECT count(*)::int FROM clinical.observation_schedules WHERE admission_id = a.id) AS schedule_count
