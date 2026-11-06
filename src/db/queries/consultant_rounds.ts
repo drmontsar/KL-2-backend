@@ -41,7 +41,7 @@ export async function listConsultantWorklist(actor_user_id: string) {
       WHERE admission_id = a.id AND consultant_id = ${actor_user_id} ORDER BY signed_at DESC LIMIT 1
     ) round ON true
     WHERE a.status = 'active' AND (
-      a.assigned_doctor_id = ${actor_user_id} OR EXISTS (
+      EXISTS (
         SELECT 1 FROM clinical.staff_assignments sa
         WHERE sa.admission_id = a.id AND sa.user_id = ${actor_user_id}
           AND sa.assignment_type = 'treating_consultant' AND sa.ends_at IS NULL
@@ -56,7 +56,7 @@ export async function getConsultantContext(id: string, actor_user_id: string) {
   return db`
     SELECT a.id FROM clinical.admissions a
     WHERE a.id = ${id} AND a.status = 'active' AND (
-      a.assigned_doctor_id = ${actor_user_id} OR EXISTS (
+      EXISTS (
         SELECT 1 FROM clinical.staff_assignments sa WHERE sa.admission_id = a.id AND sa.user_id = ${actor_user_id}
           AND sa.assignment_type = 'treating_consultant' AND sa.ends_at IS NULL
       )
@@ -70,7 +70,7 @@ export async function signConsultantRound(body: RoundBodyInput, actor_user_id: s
       const [admission] = await tx`
       SELECT a.id FROM clinical.admissions a
       WHERE a.id = ${body.admission_id} AND a.status = 'active' AND (
-        a.assigned_doctor_id = ${actor_user_id} OR EXISTS (
+        EXISTS (
           SELECT 1 FROM clinical.staff_assignments sa WHERE sa.admission_id = a.id AND sa.user_id = ${actor_user_id}
             AND sa.assignment_type = 'treating_consultant' AND sa.ends_at IS NULL
         )

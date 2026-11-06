@@ -94,7 +94,7 @@ export async function getWardSummary(unitId: string, user: User): Promise<WardSu
         OR EXISTS (SELECT 1 FROM clinical.admissions a WHERE a.unit_id = u.id AND a.status = 'active' AND ${admissionAccessFilter(user)})
       )
     ), scoped AS (
-      SELECT a.id, a.assigned_doctor_id FROM clinical.admissions a
+      SELECT a.id FROM clinical.admissions a
       JOIN authorized_unit u ON u.id = a.unit_id
       WHERE a.status = 'active' AND ${admissionAccessFilter(user)}
     ), counts AS (
@@ -104,13 +104,10 @@ export async function getWardSummary(unitId: string, user: User): Promise<WardSu
         (SELECT count(*)::int FROM scoped a JOIN clinical.orders o ON o.admission_id = a.id WHERE o.status = 'confirmed' AND o.acknowledged_at IS NULL AND o.priority = 'stat') AS stat_orders,
         (SELECT count(*)::int FROM scoped a JOIN clinical.orders o ON o.admission_id = a.id WHERE o.status = 'confirmed' AND o.acknowledged_at IS NULL) AS pending_orders,
         (SELECT count(*)::int FROM scoped a JOIN clinical.patient_movements m ON m.admission_id = a.id WHERE m.status IN ('requested','reserved','in_transit')) AS active_shifts,
-        (SELECT count(*)::int FROM scoped a WHERE a.assigned_doctor_id IS NOT NULL
-          AND (${user.job_role === 'administrator'} OR a.assigned_doctor_id = ${user.id})
-          AND NOT EXISTS (
-            SELECT 1 FROM clinical.ipass_items i JOIN clinical.ipass_sessions s ON s.id = i.session_id
-            WHERE i.admission_id = a.id AND s.outgoing_doctor_id = a.assigned_doctor_id
-              AND s.status IN ('draft','sent') AND i.status = 'signed'
-          )) AS unsigned_handovers,
+        (SELECT count(*)::int FROM scoped a WHERE EXISTS (
+          SELECT 1 FROM clinical.ipass_items i JOIN clinical.ipass_sessions s ON s.id = i.session_id
+          WHERE i.admission_id = a.id AND s.status = 'sent' AND i.status <> 'signed'
+        )) AS unsigned_handovers,
         (SELECT count(*)::int FROM scoped a JOIN finance.claims f ON f.admission_id = a.id WHERE ${claimVisible} AND f.status = 'query_raised') AS tpa_queries,
         (SELECT count(*)::int FROM scoped a JOIN clinical.alerts al ON al.admission_id = a.id WHERE al.status = 'active' AND al.severity = 'warning') AS warning_alerts,
         (SELECT count(*)::int FROM scoped a JOIN clinical.alerts al ON al.admission_id = a.id WHERE al.status = 'active' AND al.severity = 'caution') AS caution_alerts
@@ -158,11 +155,10 @@ export async function getHeaderSummary(
         'active_alerts', (SELECT count(*)::int FROM clinical.alerts al WHERE al.admission_id = a.id AND al.status = 'active'),
         'active_referrals', (SELECT count(*)::int FROM clinical.cross_referrals r WHERE r.admission_id = a.id AND r.status IN ('sent','seen','opinion','acknowledged')),
         'active_shifts', (SELECT count(*)::int FROM clinical.patient_movements m WHERE m.admission_id = a.id AND m.status IN ('requested','reserved','in_transit')),
-        'unsigned_handovers', CASE WHEN a.assigned_doctor_id IS NOT NULL
-          AND (${user.job_role === 'administrator'} OR a.assigned_doctor_id = ${user.id}) AND a.status = 'active'
-          AND NOT EXISTS (SELECT 1 FROM clinical.ipass_items i JOIN clinical.ipass_sessions s ON s.id = i.session_id
-            WHERE i.admission_id = a.id AND s.outgoing_doctor_id = a.assigned_doctor_id AND s.status IN ('draft','sent') AND i.status = 'signed')
-          THEN 1 ELSE 0 END,
+        'unsigned_handovers', CASE WHEN a.status = 'active' AND EXISTS (
+          SELECT 1 FROM clinical.ipass_items i JOIN clinical.ipass_sessions s ON s.id = i.session_id
+          WHERE i.admission_id = a.id AND s.status = 'sent' AND i.status <> 'signed'
+        ) THEN 1 ELSE 0 END,
         'tpa_queries', CASE WHEN ${claimVisible} AND claim.status = 'query_raised' THEN 1 ELSE 0 END,
         'pending_discharge_tasks', (SELECT count(*)::int FROM clinical.discharge_tasks t JOIN clinical.discharge_plans dp ON dp.id = t.plan_id
           WHERE dp.admission_id = a.id AND dp.status IN ('pending_approval','approved') AND t.status = 'pending')

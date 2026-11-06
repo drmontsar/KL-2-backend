@@ -355,7 +355,7 @@ function activeShiftUnitFilter(user_id: string) {
   )`;
 }
 export function admissionAccessFilter(user: UserCtx) {
-  if (user.job_role === 'administrator' || (!user.job_role && user.role === 'admin'))
+  if (user.job_role === 'administrator' || user.job_role === 'duty_doctor' || (!user.job_role && user.role === 'admin'))
     return db`TRUE`;
   return db`(
     EXISTS (
@@ -367,7 +367,7 @@ export function admissionAccessFilter(user: UserCtx) {
     )
     OR a.assigned_to = ${user.id}
     OR EXISTS (SELECT 1 FROM clinical.cross_referrals r WHERE r.admission_id = a.id AND r.consultant_id = ${user.id} AND r.status IN ('sent','seen','opinion','acknowledged'))
-    OR (${user.role === 'doctor'} AND a.assigned_doctor_id IS NULL AND ${activeShiftUnitFilter(user.id)})
+    OR (${user.role === 'doctor' && user.job_role !== 'consultant'} AND ${activeShiftUnitFilter(user.id)})
     OR EXISTS (SELECT 1 FROM clinical.break_glass_access bg WHERE bg.admission_id = a.id AND bg.user_id = ${user.id} AND bg.revoked_at IS NULL AND bg.expires_at > now())
   )`;
 }
@@ -396,6 +396,13 @@ export function listAdmissionsForUser(
     WHERE a.status = 'active'
   `;
 
+  if (user.job_role === 'duty_doctor' || (user.role === 'doctor' && !user.job_role)) {
+    if (ward) {
+      return db<ActiveAdmissionRow[]>`${base} AND a.ward = ${ward} ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at`;
+    }
+    return db<ActiveAdmissionRow[]>`${base} ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at`;
+  }
+
   if (user.role === 'doctor' && scope !== 'open') {
     const assigned = db`(
       EXISTS (
@@ -423,12 +430,12 @@ export function listAdmissionsForUser(
     const inActiveShiftUnit = activeShiftUnitFilter(user.id);
     if (ward) {
       return db<ActiveAdmissionRow[]>`
-        ${base} AND a.assigned_doctor_id IS NULL AND a.ward = ${ward} AND ${inActiveShiftUnit}
+        ${base} AND a.ward = ${ward} AND ${inActiveShiftUnit}
         ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at
       `;
     }
     return db<ActiveAdmissionRow[]>`
-      ${base} AND a.assigned_doctor_id IS NULL AND ${inActiveShiftUnit}
+      ${base} AND ${inActiveShiftUnit}
       ORDER BY a.ward, ${SEVERITY_ORDER}, a.admitted_at
     `;
   }
@@ -453,38 +460,10 @@ export function listAdmissionsForUser(
   return db<ActiveAdmissionRow[]>`${base} AND false`;
 }
 
+// Retained for legacy callers; individual duty-doctor claims are no longer supported.
 export async function claimAdmission(
-  id: string,
-  doctor_id: string,
+  _id: string,
+  _doctor_id: string,
 ): Promise<Admission | null | 'already_claimed'> {
-  return db
-    .begin(async (tx) => {
-      const [row] = await tx<Admission[]>`
-      UPDATE clinical.admissions a
-      SET assigned_doctor_id = ${doctor_id}, revision = a.revision + 1
-      WHERE a.id = ${id} AND a.status = 'active' AND a.assigned_doctor_id IS NULL
-        AND ${activeShiftUnitFilter(doctor_id)}
-        AND EXISTS (SELECT 1 FROM staff.users u WHERE u.id = ${doctor_id} AND u.role = 'doctor' AND u.disabled_at IS NULL)
-      RETURNING a.*
-    `;
-      if (!row) {
-        const [existing] = await tx`
-        SELECT 1 FROM clinical.admissions a WHERE a.id = ${id} AND a.status = 'active'
-          AND a.assigned_doctor_id IS NOT NULL
-          AND (a.assigned_doctor_id = ${doctor_id} OR ${activeShiftUnitFilter(doctor_id)})
-      `;
-        return existing ? 'already_claimed' : null;
-      }
-      await tx`INSERT INTO clinical.staff_assignments (admission_id, user_id, assignment_type, assigned_by)
-      VALUES (${id}, ${doctor_id}, 'duty_doctor', ${doctor_id}) ON CONFLICT DO NOTHING`;
-      await auditLog(tx, {
-        action: 'claim',
-        record_table: 'clinical.admissions',
-        record_id: id,
-        actor_user_id: doctor_id,
-        after: row,
-      });
-      return row;
-    })
-    .catch(rethrowDatabaseError);
+  return null;
 }

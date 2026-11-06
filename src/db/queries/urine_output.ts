@@ -34,7 +34,6 @@ export async function escalateLowUrine(
   tx: postgres.TransactionSql,
   admissionId: string,
   actorId: string,
-  doctorId: string | null,
 ): Promise<void> {
   const measurement = await getUrineOutput(tx, admissionId);
   if (measurement.status !== 'low') return;
@@ -45,10 +44,13 @@ export async function escalateLowUrine(
   `;
   if (!alert) return;
   await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actorId}, 'create', 'clinical.alerts', ${alert.id}, ${tx.json(measurement)})`;
-  if (!doctorId) return;
-  const [notification] = await tx<{ id: string; type: string; payload: Json; created_at: Date }[]>`
+  const notifications = await tx<{ user_id: string; id: string; type: string; payload: Json; created_at: Date }[]>`
     INSERT INTO clinical.notifications (user_id, type, payload)
-    VALUES (${doctorId}, 'nursing.low_urine_output', ${tx.json({ admission_id: admissionId, alert_id: alert.id })}) RETURNING *
+    SELECT id, 'nursing.low_urine_output', ${tx.json({ admission_id: admissionId, alert_id: alert.id })}
+    FROM staff.users u WHERE u.job_role = 'duty_doctor' AND u.disabled_at IS NULL
+      AND EXISTS (SELECT 1 FROM clinical.admissions a JOIN staff.unit_memberships m ON m.unit_id = a.unit_id
+        WHERE a.id = ${admissionId} AND m.user_id = u.id) RETURNING *
   `;
-  await tx`SELECT pg_notify(${notifChannel(doctorId)}, ${JSON.stringify(notification)})`;
+  for (const notification of notifications)
+    await tx`SELECT pg_notify(${notifChannel(notification.user_id)}, ${JSON.stringify(notification)})`;
 }

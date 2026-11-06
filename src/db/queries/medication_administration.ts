@@ -223,17 +223,17 @@ export async function recordDoseException(
     `;
       if (!dose) return null;
       await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, ${action}, 'clinical.medication_doses', ${id}, ${tx.json(dose as unknown as Json)})`;
-      const [admission] = await tx<
-        { assigned_doctor_id: string | null }[]
-      >`SELECT assigned_doctor_id FROM clinical.admissions WHERE id = ${admission_id}`;
-      if (admission.assigned_doctor_id) {
-        const [notification] = await tx<
-          { id: string; type: string; payload: Json; created_at: Date }[]
-        >`
-        INSERT INTO clinical.notifications (user_id, type, payload) VALUES (${admission.assigned_doctor_id}, ${action === 'hold' ? 'medication.held' : 'medication.missed'}, ${tx.json({ dose_id: id, admission_id: admission_id })}) RETURNING *
+      const notifications = await tx<
+        { user_id: string; id: string; type: string; payload: Json; created_at: Date }[]
+      >`
+        INSERT INTO clinical.notifications (user_id, type, payload)
+        SELECT id, ${action === 'hold' ? 'medication.held' : 'medication.missed'}, ${tx.json({ dose_id: id, admission_id: admission_id })}
+        FROM staff.users u WHERE u.job_role = 'duty_doctor' AND u.disabled_at IS NULL
+          AND EXISTS (SELECT 1 FROM clinical.admissions a JOIN staff.unit_memberships m ON m.unit_id = a.unit_id
+            WHERE a.id = ${admission_id} AND m.user_id = u.id) RETURNING *
       `;
-        await tx`SELECT pg_notify(${notifChannel(admission.assigned_doctor_id)}, ${JSON.stringify(notification)})`;
-      }
+      for (const notification of notifications)
+        await tx`SELECT pg_notify(${notifChannel(notification.user_id)}, ${JSON.stringify(notification)})`;
       return dose;
     })
     .catch(rethrowDatabaseError);

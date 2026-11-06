@@ -5,7 +5,6 @@ import { UpdateDraftBody } from '../contracts/notes';
 import { canAccessPatient, canAccessResource } from '../db/queries/access';
 import {
   assignAdmission,
-  claimAdmission,
   createAdmission,
   dischargeAdmission,
   getAdmissionForUser,
@@ -15,7 +14,6 @@ import {
   updateAdmission,
 } from '../db/queries/admissions';
 import { createHandoff } from '../db/queries/handoffs';
-import { createTransferRequest } from '../db/queries/transfer_requests';
 import type { User } from '../db/queries/users';
 
 type Variables = { user: User };
@@ -402,16 +400,7 @@ admissionsRouter.openapi(
     },
   }),
   async (c) => {
-    const { id } = c.req.valid('param');
-    const user = c.get('user');
-    if (user.role !== 'doctor') {
-      return c.json({ error: 'only doctors can claim admissions' }, 403);
-    }
-    const result = await claimAdmission(id, user.id);
-    if (result === 'already_claimed')
-      return c.json({ error: 'already claimed by another doctor' }, 409);
-    if (!result) return c.json({ error: 'not found or not active' }, 404);
-    return c.json(result, 200);
+    return c.json({ error: 'individual doctor claims are no longer supported' }, 409);
   },
 );
 
@@ -450,25 +439,7 @@ admissionsRouter.openapi(
     },
   }),
   async (c) => {
-    const { id } = c.req.valid('param');
-    const user = c.get('user');
-    if (user.role !== 'doctor')
-      return c.json({ error: 'only doctors can transfer admissions' }, 403);
-    const { to_doctor_id, expected_revision, message } = c.req.valid('json');
-    if (to_doctor_id === user.id) return c.json({ error: 'cannot transfer to yourself' }, 409);
-    const result = await createTransferRequest({
-      admission_id: id,
-      from_doctor_id: user.id,
-      to_doctor_id,
-      expected_revision,
-      message,
-    });
-    if (result === 'not_owner') return c.json({ error: 'not your patient' }, 403);
-    if (result === 'conflict') return c.json({ error: 'revision conflict' }, 409);
-    if (result === 'bad_target')
-      return c.json({ error: 'target doctor not found or inactive' }, 404);
-
-    return c.json(result, 201);
+    return c.json({ error: 'individual doctor transfers are no longer supported' }, 409);
   },
 );
 

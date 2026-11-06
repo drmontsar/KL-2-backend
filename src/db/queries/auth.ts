@@ -9,11 +9,11 @@ export async function getUserByPhone(phone: string): Promise<User | null> {
   return row ?? null;
 }
 
-export async function createSession(userId: string): Promise<string> {
+export async function createSession(userId: string, shift?: 'morning' | 'afternoon' | 'night'): Promise<string> {
   const token = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');
   await db`
-    INSERT INTO staff.sessions (user_id, token)
-    VALUES (${userId}, ${token})
+    INSERT INTO staff.sessions (user_id, token, selected_shift)
+    VALUES (${userId}, ${token}, ${shift ?? null})
   `;
   return token;
 }

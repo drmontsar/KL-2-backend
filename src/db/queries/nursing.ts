@@ -119,8 +119,8 @@ export async function recordPatientWeight(
 ) {
   return db
     .begin(async (tx) => {
-      const [admission] = await tx<{ assigned_doctor_id: string | null }[]>`
-      SELECT assigned_doctor_id FROM clinical.admissions WHERE id = ${id} AND status = 'active' FOR UPDATE
+      const [admission] = await tx<{ id: string }[]>`
+      SELECT id FROM clinical.admissions WHERE id = ${id} AND status = 'active' FOR UPDATE
     `;
       if (!admission) return null;
       const [row] = await tx<Weight[]>`
@@ -130,7 +130,7 @@ export async function recordPatientWeight(
     `;
       if (!row) return null;
       await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'record', 'clinical.patient_weights', ${row.id}, ${tx.json(row as unknown as Json)})`;
-      await escalateLowUrine(tx, id, actor_user_id, admission.assigned_doctor_id);
+      await escalateLowUrine(tx, id, actor_user_id);
       return row;
     })
     .catch(rethrowDatabaseError);
@@ -139,8 +139,8 @@ export async function recordPatientWeight(
 export async function recordFluidEntry(id: string, actor_user_id: string, body: FluidBodyInput) {
   return db
     .begin(async (tx) => {
-      const [admission] = await tx<{ assigned_doctor_id: string | null }[]>`
-      SELECT assigned_doctor_id FROM clinical.admissions WHERE id = ${id} AND status = 'active' FOR UPDATE
+      const [admission] = await tx<{ id: string }[]>`
+      SELECT id FROM clinical.admissions WHERE id = ${id} AND status = 'active' FOR UPDATE
     `;
       if (!admission) return null;
       const [fluid] = await tx<Fluid[]>`
@@ -151,7 +151,7 @@ export async function recordFluidEntry(id: string, actor_user_id: string, body: 
       if (!fluid) return null;
       await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'record', 'clinical.fluid_entries', ${fluid.id}, ${tx.json(fluid as unknown as Json)})`;
       if (body.direction === 'output' && body.category.toLowerCase() === 'urine') {
-        await escalateLowUrine(tx, id, actor_user_id, admission.assigned_doctor_id);
+        await escalateLowUrine(tx, id, actor_user_id);
       }
       return fluid;
     })
@@ -181,7 +181,7 @@ export async function sendSbarCall(actor_user_id: string, body: CallBodyInput, i
       INSERT INTO clinical.nursing_sbar_calls (admission_id, called_by, doctor_id, situation, background, assessment, request)
       SELECT a.id, ${actor_user_id}, u.id, ${body.situation}, ${body.background}, ${body.assessment}, ${body.request}
       FROM clinical.admissions a JOIN staff.users u ON u.id = ${body.doctor_id} AND u.role = 'doctor' AND u.disabled_at IS NULL
-      WHERE a.id = ${id} AND a.status = 'active' AND a.assigned_doctor_id = u.id RETURNING *
+      WHERE a.id = ${id} AND a.status = 'active' AND u.job_role = 'duty_doctor' RETURNING *
     `;
       if (!call) return null;
       await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'send', 'clinical.nursing_sbar_calls', ${call.id}, ${tx.json(call as unknown as Json)})`;

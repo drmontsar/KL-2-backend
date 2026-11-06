@@ -44,8 +44,7 @@ export async function listCrossReferrals(
     SELECT r.* FROM clinical.cross_referrals r
     WHERE (${query.admission_id ?? null}::uuid IS NULL OR r.admission_id = ${query.admission_id ?? null}::uuid)
       AND (${query.status ?? null}::text IS NULL OR r.status = ${query.status ?? null}::text)
-      AND (${user.job_role === 'administrator'} OR r.consultant_id = ${user.id} OR r.requested_by = ${user.id}
-        OR EXISTS (SELECT 1 FROM clinical.admissions a WHERE a.id = r.admission_id AND a.assigned_doctor_id = ${user.id})
+      AND (${user.job_role === 'administrator' || user.job_role === 'duty_doctor'} OR r.consultant_id = ${user.id} OR r.requested_by = ${user.id}
         OR EXISTS (SELECT 1 FROM clinical.staff_assignments s WHERE s.admission_id = r.admission_id AND s.user_id = ${user.id} AND s.ends_at IS NULL))
     ORDER BY r.created_at DESC LIMIT 100
   `.catch(rethrowDatabaseError);

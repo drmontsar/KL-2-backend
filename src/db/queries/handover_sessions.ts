@@ -52,7 +52,7 @@ export type HandoverSessionDetail = HandoverSession & {
   items: HandoverItemWithAck[];
 };
 
-// Creates a handover session and snapshots all active admissions for the outgoing doctor.
+// Creates a handover session and snapshots all active admissions.
 // Optionally filtered to a specific ward.
 export async function createHandoverSession(data: {
   outgoing_doctor_id: string;
@@ -67,7 +67,7 @@ export async function createHandoverSession(data: {
     `;
       if (!incoming) return 'bad_incoming';
 
-      // Build snapshots for all active admissions owned by outgoing doctor
+      // Build snapshots for all active admissions
       const snapshots = data.ward
         ? await tx`
           SELECT
@@ -96,8 +96,7 @@ export async function createHandoverSession(data: {
             (SELECT n.draft_body FROM clinical.notes n WHERE n.admission_id = a.id ORDER BY n.created_at DESC LIMIT 1) AS latest_note
           FROM clinical.admissions a
           JOIN clinical.patients p ON p.id = a.patient_id
-          WHERE a.assigned_doctor_id = ${data.outgoing_doctor_id}
-            AND a.status = 'active'
+          WHERE a.status = 'active'
             AND a.ward = ${data.ward}
           ORDER BY CASE a.severity WHEN 'unstable' THEN 0 WHEN 'watcher' THEN 1 ELSE 2 END, a.admitted_at
         `
@@ -128,8 +127,7 @@ export async function createHandoverSession(data: {
             (SELECT n.draft_body FROM clinical.notes n WHERE n.admission_id = a.id ORDER BY n.created_at DESC LIMIT 1) AS latest_note
           FROM clinical.admissions a
           JOIN clinical.patients p ON p.id = a.patient_id
-          WHERE a.assigned_doctor_id = ${data.outgoing_doctor_id}
-            AND a.status = 'active'
+          WHERE a.status = 'active'
           ORDER BY CASE a.severity WHEN 'unstable' THEN 0 WHEN 'watcher' THEN 1 ELSE 2 END, a.admitted_at
         `;
 

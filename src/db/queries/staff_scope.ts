@@ -167,6 +167,7 @@ export async function createStaffAssignment(data: {
   assignment_type: StaffAssignment['assignment_type'];
   assigned_by: string;
 }): Promise<StaffAssignment | null> {
+  if (data.assignment_type === 'duty_doctor') return null;
   return db
     .begin(async (tx) => {
       const [admission] =

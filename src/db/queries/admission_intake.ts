@@ -62,26 +62,31 @@ export async function acceptAdmissionRequest(
       `;
       if (!bed) return null;
       const [staff] = await tx`
-        SELECT c.id FROM staff.users c JOIN staff.users d ON d.id = ${body.duty_doctor_id}
-        WHERE c.id = ${body.consultant_id} AND c.job_role = 'consultant' AND c.disabled_at IS NULL AND d.role = 'doctor' AND d.disabled_at IS NULL
+        SELECT c.id FROM staff.users c
+        WHERE c.id = ${body.consultant_id} AND c.job_role = 'consultant' AND c.disabled_at IS NULL
       `;
       if (!staff) return null;
       const [admission] = await tx<z.infer<typeof AdmissionSchema>[]>`
-        INSERT INTO clinical.admissions (patient_id, ward, bed, bed_id, unit_id, assigned_doctor_id, created_by)
-        VALUES (${request.patient_id}, ${bed.ward_name}, ${bed.label}, ${bed.id}, ${bed.unit_id}, ${body.duty_doctor_id}, ${actor_user_id}) RETURNING *
+        INSERT INTO clinical.admissions (patient_id, ward, bed, bed_id, unit_id, created_by)
+        VALUES (${request.patient_id}, ${bed.ward_name}, ${bed.label}, ${bed.id}, ${bed.unit_id}, ${actor_user_id}) RETURNING *
       `;
       await tx`INSERT INTO clinical.bed_assignments (admission_id, bed_id, starts_at, assigned_by) VALUES (${admission.id}, ${bed.id}, ${admission.admitted_at}::timestamptz, ${actor_user_id})`;
-      await tx`INSERT INTO clinical.staff_assignments (admission_id, user_id, assignment_type, assigned_by) VALUES (${admission.id}, ${body.consultant_id}, 'treating_consultant', ${actor_user_id}), (${admission.id}, ${body.duty_doctor_id}, 'duty_doctor', ${actor_user_id})`;
+      await tx`INSERT INTO clinical.staff_assignments (admission_id, user_id, assignment_type, assigned_by) VALUES (${admission.id}, ${body.consultant_id}, 'treating_consultant', ${actor_user_id})`;
       await tx`INSERT INTO clinical.observation_schedules (admission_id, frequency_minutes, next_due_at, source, policy_version, updated_by) VALUES (${admission.id}, 720, now(), 'news2_policy', 'NEWS2-2017-scale-1', ${actor_user_id})`;
       await tx`INSERT INTO clinical.diagnoses (patient_id, admission_id, description, created_by) VALUES (${request.patient_id}, ${admission.id}, ${request.diagnosis}, ${actor_user_id})`;
       await tx`INSERT INTO clinical.admission_checklist_items (admission_id, code) SELECT ${admission.id}, code FROM unnest(ARRAY['registration_consent','payer','bed_assignment','unit_arrival','admission_orders','doctor_assessment','nursing_assessment','consultant_review']) AS code`;
       await tx`UPDATE clinical.admission_checklist_items SET status = 'completed', completed_by = ${actor_user_id}, completed_at = now(), evidence = 'Managed bed assigned' WHERE admission_id = ${admission.id} AND code = 'bed_assignment'`;
-      const [notification] = await tx<
-        { id: string; type: string; payload: Json; created_at: Date }[]
+      const notifications = await tx<
+        { user_id: string; id: string; type: string; payload: Json; created_at: Date }[]
       >`
-        INSERT INTO clinical.notifications (user_id, type, payload) VALUES (${body.duty_doctor_id}, 'admission.accepted', ${tx.json({ admission_id: admission.id, request_id: id })}) RETURNING *
+        INSERT INTO clinical.notifications (user_id, type, payload)
+        SELECT id, 'admission.accepted', ${tx.json({ admission_id: admission.id, request_id: id })}
+        FROM staff.users u WHERE u.job_role = 'duty_doctor' AND u.disabled_at IS NULL
+          AND EXISTS (SELECT 1 FROM staff.unit_memberships m WHERE m.unit_id = ${bed.unit_id} AND m.user_id = u.id)
+        RETURNING *
       `;
-      await tx`SELECT pg_notify(${notifChannel(body.duty_doctor_id)}, ${JSON.stringify(notification)})`;
+      for (const notification of notifications)
+        await tx`SELECT pg_notify(${notifChannel(notification.user_id)}, ${JSON.stringify(notification)})`;
       const [updated] = await tx<
         AdmissionRequest[]
       >`UPDATE clinical.admission_requests SET status = 'accepted', resolved_by = ${actor_user_id}, resolved_at = now(), admission_id = ${admission.id} WHERE id = ${id} RETURNING *`;

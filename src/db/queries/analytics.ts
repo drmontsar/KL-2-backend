@@ -84,7 +84,7 @@ export async function getDoctorAnalytics(doctor_id: string): Promise<DoctorAnaly
       SELECT a.id, a.severity, a.ward, a.bed, a.assigned_to, a.admitted_at, p.name AS patient_name
       FROM clinical.admissions a
       JOIN clinical.patients p ON p.id = a.patient_id
-      WHERE a.assigned_doctor_id = ${doctor_id} AND a.status = 'active'
+      WHERE a.status = 'active'
     ),
 
     severity_counts AS (
@@ -147,21 +147,24 @@ export async function getDoctorAnalytics(doctor_id: string): Promise<DoctorAnaly
       WHERE t.admission_id IN (SELECT id FROM active) AND t.status = 'pending'
     ),
 
-    -- Career: all admissions ever assigned to this doctor
+    -- Historical participation is based on signed handovers, not patient ownership.
     career AS (
-      SELECT
-        COUNT(*)                                            AS total_handled,
-        COUNT(*) FILTER (WHERE status = 'discharged')      AS total_discharged
-      FROM clinical.admissions
-      WHERE assigned_doctor_id = ${doctor_id}
+      SELECT COUNT(DISTINCT a.id) AS total_handled,
+        COUNT(DISTINCT a.id) FILTER (WHERE a.status = 'discharged') AS total_discharged
+      FROM clinical.admissions a
+      JOIN clinical.ipass_items i ON i.admission_id = a.id
+      JOIN clinical.ipass_sessions s ON s.id = i.session_id
+      WHERE i.status = 'signed' AND (s.outgoing_doctor_id = ${doctor_id} OR s.incoming_doctor_id = ${doctor_id})
     ),
 
-    -- Top diagnoses across all of this doctor's admissions (active + discharged)
+    -- Top diagnoses across admissions handled in signed handovers
     case_mix AS (
       SELECT d.description, COUNT(*)::int AS count
       FROM clinical.diagnoses d
       JOIN clinical.admissions a ON a.id = d.admission_id
-      WHERE a.assigned_doctor_id = ${doctor_id}
+      WHERE EXISTS (SELECT 1 FROM clinical.ipass_items i JOIN clinical.ipass_sessions s ON s.id = i.session_id
+        WHERE i.admission_id = a.id AND i.status = 'signed'
+          AND (s.outgoing_doctor_id = ${doctor_id} OR s.incoming_doctor_id = ${doctor_id}))
       GROUP BY d.description
       ORDER BY count DESC
       LIMIT 10

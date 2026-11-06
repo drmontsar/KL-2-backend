@@ -18,7 +18,7 @@ Start the server with `bun run server`.
 
 ## Authentication
 
-Call `POST /auth/request` with `phone`, then call `POST /auth/verify` with `phone` and `otp`. Only pre-registered, active staff can verify. Send the returned token on protected routes as `Authorization: Bearer <token>`. Call `DELETE /auth/session` to revoke it.
+Call `POST /auth/request` with `phone`, then call `POST /auth/verify` with `phone` and `otp`. Only pre-registered, active staff can verify. In development/test, new accounts may use `role: "consultant"` in `/auth/request`; the response identifies consultants by `user.job_role: "consultant"`. Duty doctors may select `shift: "morning" | "afternoon" | "night"` in `/auth/verify`. The choice is saved on the session and echoed in the response; it is informational and does not restrict patient access. Shift times are 08:00–14:00, 14:00–20:00 and 20:00–08:00 (local hospital time). Send the returned token on protected routes as `Authorization: Bearer <token>`. Call `DELETE /auth/session` to revoke it.
 
 Development and test accept any non-empty OTP for a registered phone. No real OTP provider exists. Production returns HTTP 503 from `/auth/request` and `/auth/verify`. Logs exclude the phone, OTP, and session token.
 
@@ -71,7 +71,7 @@ Counter definitions:
 - `news_critical`: latest NEWS2 ≥ 7. `news_warning`: latest NEWS2 5–6 or a single-red-parameter escalation below 7.
 - `pending_orders`: confirmed orders not yet acknowledged; `stat_orders` is the STAT subset. Draft, acknowledged, completed, and discontinued orders are excluded.
 - `active_shifts`: open **patient movements** (`requested`, `reserved`, `in_transit`), not staff shifts.
-- `unsigned_handovers`: active patients assigned to the current doctor without a signed I-PASS item in an open session. For administrators this includes all scoped assigned patients.
+- `unsigned_handovers`: active patients with an unsigned item in a sent I-PASS session, regardless of individual duty-doctor assignments.
 - `tpa_queries`: claims in `query_raised`. Claim details and TPA counts are hidden from nurses to match the claims API; `claim_data_visible: false` indicates that zero counts or a null claim are redacted, not necessarily absent.
 - `master_warnings`: unacknowledged warning alerts plus pending STAT orders. `master_cautions`: unacknowledged caution alerts plus visible TPA queries and unsigned handovers. These are counts, not separate acknowledgement records for TPA queries or handovers.
 
@@ -124,7 +124,7 @@ These actions do not contact an insurer or process payments. Discharge billing r
 
 ### Admission intake and patient movement
 
-`POST /admission-requests` records emergency, OPD, elective, or external requests for an existing patient; `GET /admission-requests` lists requests in scope. Accept or decline using `/admission-requests/{id}/accept` or `/decline`. Acceptance requires an available managed bed, consultant, and duty doctor, and creates a first-hours checklist. `POST /admissions/{id}/take-nursing-assignment` lets a nurse assigned to the unit take an unassigned bed. The checklist is at `/admissions/{id}/admission-checklist`.
+`POST /admission-requests` records emergency, OPD, elective, or external requests for an existing patient; `GET /admission-requests` lists requests in scope. Accept or decline using `/admission-requests/{id}/accept` or `/decline`. Acceptance requires an available managed bed and treating consultant (no duty doctor ID), and creates a first-hours checklist. `POST /admissions/{id}/take-nursing-assignment` lets a nurse assigned to the unit take an unassigned bed. The checklist is at `/admissions/{id}/admission-checklist`.
 
 `POST /patient-movements` requests a permanent or temporary move. Permanent moves require `/patient-movements/{id}/reserve` by bed desk/admin; `/depart`, `/arrive`, `/return`, and `/cancel` perform state transitions. Reservations block other bed assignments, temporary moves retain the source bed, and NEWS2 ≥ 5 requires a nurse or doctor escort. A current NEWS2 assessment is required before movement.
 
@@ -148,7 +148,7 @@ Nurse bedside handovers use the equivalent `/nurse-handover` session endpoints. 
 
 ### Consultant care transfer
 
-`POST /consultant-care-transfers` requests a treating-consultant change using `admission_id`, `to_consultant_id`, `reason`, `discussed_with_current: true`, and `patient_family_informed: true`. The current consultant releases the request using `POST /consultant-care-transfers/{id}/release`; the receiving consultant then uses `/accept` or `/decline` (with a reason). The requester or current consultant can `/withdraw` a pending request. `GET /consultant-care-transfers` lists requests involving the current clinician. Acceptance changes the treating-consultant assignment, not the duty doctor or bed, and notifies billing staff for patients with coverage.
+`POST /consultant-care-transfers` requests a treating-consultant change using `admission_id`, `to_consultant_id`, `reason`, `discussed_with_current: true`, and `patient_family_informed: true`. The current consultant releases the request using `POST /consultant-care-transfers/{id}/release`; the receiving consultant then uses `/accept` or `/decline` (with a reason). The requester or current consultant can `/withdraw` a pending request. `GET /consultant-care-transfers` lists requests involving the current clinician. Acceptance changes the treating-consultant assignment, not the bed, and notifies billing staff for patients with coverage.
 
 ### Cross-referrals
 
@@ -211,10 +211,10 @@ A caution or warning is created for every result above low escalation. Filter al
 | Parameter | Effect |
 |-----------|--------|
 | `ward` | Show only admissions in this ward |
-| `scope=mine` | Show admissions assigned to the signed-in doctor; nurse lists are always restricted to the signed-in nurse |
-| `scope=open` | Show unclaimed admissions in a unit with current membership and an active shift |
+| `scope=mine` | Duty doctors see all active admissions; consultants see their assigned admissions; nurse lists remain scoped to the nurse |
+| `scope=open` | Duty doctors still see all active admissions; no patient claiming is needed |
 
-`POST /admissions/{id}/claim` applies the same unit and active-shift restrictions. A doctor cannot acquire access through an arbitrary admission ID. Clinical content changes also advance the admission revision. Retrieve the latest revision before a revision-sensitive update.
+Duty doctors may access active patients without an assigned patient or active shift. Legacy `POST /admissions/{id}/claim`, `/transfer-doctor`, and `/transfer-requests/{id}/accept` return 409. New admission intake requires `consultant_id` but no `duty_doctor_id`. Handovers snapshot all active patients (optionally filtered by ward) and do not reassign patients. Individual duty-doctor assignments are retired; existing assignments are closed by migration 053. Clinical content changes also advance the admission revision. Retrieve the latest revision before a revision-sensitive update.
 
 ---
 

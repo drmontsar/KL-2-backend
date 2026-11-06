@@ -1,7 +1,6 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from 'zod';
 import {
-  acceptTransferRequest,
   listTransferRequests,
   rejectTransferRequest,
 } from '../db/queries/transfer_requests';
@@ -67,14 +66,7 @@ transferRequestsRouter.openapi(
     },
   }),
   async (c) => {
-    const user = c.get('user');
-    const { id } = c.req.valid('param');
-    const result = await acceptTransferRequest(id, user.id);
-    if (result === 'not_yours') return c.json({ error: 'not your request' }, 403);
-    if (result === 'not_pending') return c.json({ error: 'request already resolved' }, 409);
-    if (result === 'conflict') return c.json({ error: 'admission was already reassigned' }, 409);
-
-    return c.json(result.admission, 200);
+    return c.json({ error: 'individual doctor transfers are no longer supported' }, 409);
   },
 );
 
