@@ -27,20 +27,19 @@ Development and test accept any non-empty OTP for a registered phone. No real OT
 ### Doctor
 
 1. Register the patient. Use `POST /patients`. Include allergies in the request body.
-2. Start an admission for the patient. Use `POST /admissions`.
-3. Add diagnoses. Use `POST /admissions/{id}/diagnoses`.
-4. Create orders for medication, investigations, or nursing actions. Use `POST /admissions/{id}/orders`.
-5. Confirm each order. Use `POST /orders/{id}/confirm`. This creates a task for the nurse.
-6. Assign the admission to a nurse. Use `POST /admissions/{id}/assign`.
-7. Discharge the patient at the end of the visit. Use `POST /admissions/{id}/discharge`.
-8. Resolve a diagnosis when it is no longer active. Use `POST /diagnoses/{id}/resolve`.
+2. Create an admission request with `POST /admission-requests`; accept it with `POST /admission-requests/{id}/accept` and `bed_id`, `consultant_id`, `nurse_id`. Direct `POST /admissions` is retired (409).
+3. The assigned nurse confirms the patient is in bed with `POST /admissions/{id}/confirm-in-bed`.
+4. Add diagnoses with `POST /admissions/{id}/diagnoses`.
+5. Create orders with `POST /admissions/{id}/orders`, then confirm them with `POST /orders/{id}/confirm`.
+6. Discharge with `POST /admissions/{id}/discharge`; resolve diagnoses with `POST /diagnoses/{id}/resolve`.
 
 ### Nurse
 
-1. Get assigned admissions. Use `GET /admissions` while signed in as the nurse.
-2. Write notes on an assigned admission. Use `POST /admissions/{id}/notes`.
-3. View pending tasks. Use `GET /admissions/{id}/tasks?status=pending`.
-4. Complete a task. Use `POST /tasks/{id}/complete`.
+1. Get assigned admissions with `GET /admissions`. Incoming patients have `arrival_status: "incoming"`; their beds show `reserved` until check-in.
+2. Once the patient is physically in bed, call `POST /admissions/{id}/confirm-in-bed`; only the assigned nurse can do this.
+3. Write notes on an assigned admission. Use `POST /admissions/{id}/notes`.
+4. View pending tasks. Use `GET /admissions/{id}/tasks?status=pending`.
+5. Complete a task. Use `POST /tasks/{id}/complete`.
 
 ---
 
@@ -124,7 +123,7 @@ These actions do not contact an insurer or process payments. Discharge billing r
 
 ### Admission intake and patient movement
 
-`POST /admission-requests` records emergency, OPD, elective, or external requests for an existing patient; `GET /admission-requests` lists requests in scope. Accept or decline using `/admission-requests/{id}/accept` or `/decline`. Acceptance requires an available managed bed and treating consultant (no duty doctor ID), and creates a first-hours checklist. `POST /admissions/{id}/take-nursing-assignment` lets a nurse assigned to the unit take an unassigned bed. The checklist is at `/admissions/{id}/admission-checklist`.
+`POST /admission-requests` records emergency, OPD, elective, or external requests for an existing patient; `GET /admission-requests` lists requests in scope. Accept or decline using `/admission-requests/{id}/accept` or `/decline`. Acceptance requires `bed_id`, `consultant_id`, and `nurse_id` (an enabled staff nurse; no duty doctor ID). It reserves the managed bed as an active admission with `arrival_status: "incoming"`, assigns the nurse, and creates a first-hours checklist. For the UI, show incoming patients in a dashed-border ward card, with the assigned nurse and pending `unit_arrival` checklist step. Only that nurse can `POST /admissions/{id}/confirm-in-bed` (no body); it atomically sets `arrival_status: "admitted"` and `arrived_at`, completes `unit_arrival`, and starts observation scheduling. The response is the admission; repeat/wrong-nurse requests return 409 and non-nurses return 403. The regular lifecycle `status` stays `active`/`discharged` for compatibility; use `arrival_status` for the incoming/admitted label. Existing admissions are `admitted`. The generic checklist completion endpoint cannot complete `unit_arrival`. The checklist is at `/admissions/{id}/admission-checklist`. The older `POST /admissions/{id}/take-nursing-assignment` remains for legacy unassigned admissions.
 
 `POST /patient-movements` requests a permanent or temporary move. Permanent moves require `/patient-movements/{id}/reserve` by bed desk/admin; `/depart`, `/arrive`, `/return`, and `/cancel` perform state transitions. Reservations block other bed assignments, temporary moves retain the source bed, and NEWS2 ≥ 5 requires a nurse or doctor escort. A current NEWS2 assessment is required before movement.
 
@@ -214,7 +213,7 @@ A caution or warning is created for every result above low escalation. Filter al
 | `scope=mine` | Duty doctors see all active admissions; consultants see their assigned admissions; nurse lists remain scoped to the nurse |
 | `scope=open` | Duty doctors still see all active admissions; no patient claiming is needed |
 
-Duty doctors may access active patients without an assigned patient or active shift. Legacy `POST /admissions/{id}/claim`, `/transfer-doctor`, and `/transfer-requests/{id}/accept` return 409. New admission intake requires `consultant_id` but no `duty_doctor_id`. Handovers snapshot all active patients (optionally filtered by ward) and do not reassign patients. Individual duty-doctor assignments are retired; existing assignments are closed by migration 053. Clinical content changes also advance the admission revision. Retrieve the latest revision before a revision-sensitive update.
+Duty doctors may access active patients without an assigned patient or active shift. Legacy `POST /admissions/{id}/claim`, `/transfer-doctor`, and `/transfer-requests/{id}/accept` return 409. New admission intake requires both `consultant_id` and `nurse_id` but no `duty_doctor_id`. Handovers snapshot all active patients (optionally filtered by ward) and do not reassign patients. Individual duty-doctor assignments are retired; existing assignments are closed by migration 053. Clinical content changes also advance the admission revision. Retrieve the latest revision before a revision-sensitive update.
 
 ---
 

@@ -28,6 +28,7 @@ export const CreateBody = z.object({
 export const AcceptBody = z.object({
   bed_id: z.string().uuid(),
   consultant_id: z.string().uuid(),
+  nurse_id: z.string().uuid(),
 });
 
 export const DeclineBody = z.object({ reason: z.string().trim().min(1).max(5000) });

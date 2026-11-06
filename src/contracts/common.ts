@@ -62,6 +62,8 @@ export const AdmissionSchema = z.object({
   bed_id: z.string().uuid().nullable(),
   unit_id: z.string().uuid().nullable(),
   admitted_at: z.string(),
+  arrival_status: z.enum(['incoming', 'admitted']),
+  arrived_at: z.string().nullable(),
   discharged_at: z.string().nullable(),
   assigned_to: z.string().uuid().nullable(),
   assigned_doctor_id: z.string().uuid().nullable(),

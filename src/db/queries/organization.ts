@@ -38,6 +38,7 @@ export type CensusEntry = Bed & {
   severity: 'unstable' | 'watcher' | 'stable';
   assigned_doctor_id: string | null;
   assigned_to: string | null;
+  arrival_status: 'incoming' | 'admitted';
 };
 
 export function listFacilities(): Promise<Facility[]> {
@@ -82,6 +83,7 @@ export function listBeds(opts: {
   const occupancy = db`
     CASE
       WHEN b.operational_state <> 'available' THEN b.operational_state
+      WHEN a.arrival_status = 'incoming' THEN 'reserved'
       WHEN a.id IS NOT NULL THEN 'occupied'
       WHEN EXISTS (SELECT 1 FROM organization.bed_reservations br WHERE br.bed_id = b.id AND br.released_at IS NULL) THEN 'reserved'
       ELSE 'available'
@@ -138,8 +140,9 @@ export async function updateBedOperationalState(
 export function listWardCensus(ward_id: string, user: User): Promise<CensusEntry[]> {
   const base = db`
     SELECT b.id, b.room_id, r.name AS room_name, w.id AS ward_id, w.name AS ward_name,
-           b.label, b.operational_state, 'occupied' AS occupancy,
-           a.id AS admission_id, a.patient_id, p.name AS patient_name, a.severity,
+           b.label, b.operational_state,
+           CASE WHEN a.arrival_status = 'incoming' THEN 'reserved' ELSE 'occupied' END AS occupancy,
+           a.id AS admission_id, a.patient_id, p.name AS patient_name, a.severity, a.arrival_status,
            a.assigned_doctor_id, a.assigned_to
     FROM organization.beds b
     JOIN organization.rooms r ON r.id = b.room_id

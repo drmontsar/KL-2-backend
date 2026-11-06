@@ -12,6 +12,7 @@ import {
 import {
   acceptAdmissionRequest,
   completeAdmissionChecklistItem,
+  confirmPatientInBed,
   createAdmissionRequest,
   declineAdmissionRequest,
   getAdmissionChecklistItem,
@@ -96,7 +97,7 @@ admissionIntakeRouter.openapi(
             schema: z.object({ request: RequestSchema, admission: AdmissionSchema }),
           },
         },
-        description: 'Patient admitted to selected bed',
+        description: 'Patient incoming; bed reserved and nurse assigned',
       },
       403: {
         content: { 'application/json': { schema: ErrorSchema } },
@@ -200,6 +201,28 @@ admissionIntakeRouter.openapi(
 
 admissionIntakeRouter.openapi(
   createRoute({
+    method: 'post',
+    path: '/admissions/{id}/confirm-in-bed',
+    tags: ['Admission Intake'],
+    request: { params: IdParam },
+    responses: {
+      200: { content: { 'application/json': { schema: AdmissionSchema } }, description: 'Assigned nurse confirmed patient in bed' },
+      403: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Nurse access required' },
+      409: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Patient not incoming or not assigned to this nurse' },
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    if (user.job_role !== 'staff_nurse') return c.json({ error: 'nurse access required' }, 403);
+    const { id } = c.req.valid('param');
+    const admission = await confirmPatientInBed(id, user.id);
+    if (!admission) return c.json({ error: 'patient not incoming or not assigned to this nurse' }, 409);
+    return c.json(admission, 200);
+  },
+);
+
+admissionIntakeRouter.openapi(
+  createRoute({
     method: 'get',
     path: '/admissions/{id}/admission-checklist',
     tags: ['Admission Intake'],
@@ -254,6 +277,8 @@ admissionIntakeRouter.openapi(
     const [item] = await getAdmissionChecklistItem(id);
     if (!item || !(await canAccessAdmission(user, item.admission_id)))
       return c.json({ error: 'not found or forbidden' }, 403);
+    if (item.code === 'unit_arrival')
+      return c.json({ error: 'use confirm-in-bed to complete unit arrival' }, 409);
     const permitted =
       user.job_role === 'administrator' ||
       (item.code === 'nursing_assessment'
