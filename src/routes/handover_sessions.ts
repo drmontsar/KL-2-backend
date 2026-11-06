@@ -2,7 +2,6 @@ import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from 'zod';
 import {
   acknowledgeHandoverItem,
-  createHandoverSession,
   getHandoverSession,
   listHandoverSessions,
 } from '../db/queries/handover_sessions';
@@ -54,25 +53,17 @@ handoverSessionsRouter.openapi(
         content: { 'application/json': { schema: ErrorSchema } },
         description: 'Only doctors can create handover sessions',
       },
+      409: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Use shared I-PASS for new duty-doctor handovers',
+      },
     },
   }),
   async (c) => {
     const user = c.get('user');
     if (user.role !== 'doctor')
       return c.json({ error: 'only doctors can create handover sessions' }, 403);
-    const { incoming_doctor_id, ward } = c.req.valid('json');
-    if (incoming_doctor_id === user.id)
-      return c.json({ error: 'cannot hand over to yourself' }, 400);
-    const result = await createHandoverSession({
-      outgoing_doctor_id: user.id,
-      incoming_doctor_id,
-      ward,
-    });
-    if (result === 'bad_incoming')
-      return c.json({ error: 'target doctor not found or inactive' }, 400);
-    if (result === 'no_patients') return c.json({ error: 'no active patients to hand over' }, 400);
-
-    return c.json(result, 201);
+    return c.json({ error: 'use shared I-PASS for new duty-doctor handovers' }, 409);
   },
 );
 
