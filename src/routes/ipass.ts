@@ -58,7 +58,7 @@ ipassRouter.openapi(
       },
       409: {
         content: { 'application/json': { schema: ErrorSchema } },
-        description: 'No admitted patients in the selected ward, or another handover is open',
+        description: 'No active patients in the selected ward',
       },
     },
   }),
@@ -68,7 +68,7 @@ ipassRouter.openapi(
     if (user.role !== 'doctor') return c.json({ error: 'doctor access required' }, 403);
 
     const result = await createIpassSession(body, user.id);
-    if (!result) return c.json({ error: 'no admitted patients to hand over' }, 409);
+    if (!result) return c.json({ error: 'no active patients to hand over' }, 409);
     return c.json(result, 201);
   },
 );
