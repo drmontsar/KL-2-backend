@@ -45,6 +45,10 @@ try {
     'Handover should include incoming and admitted patients without a fixed receiver');
   const sessionPath = `/ipass/${detail.session.id}`;
   assert((await call(sessionPath, replacement)).status === 403, 'Draft must be private to outgoing doctor');
+  const overlapDraft = await call('/ipass', unavailable, 'POST', { ward });
+  assert(overlapDraft.status === 201 && (await overlapDraft.clone().json() as Detail).items.length === 3,
+    'Another doctor may create a handover while these patients are already in a draft');
+  const overlapDraftId = (await overlapDraft.json() as Detail).session.id;
   for (const item of detail.items) {
     const patch = await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', {
       patient_summary: 'Findings and current condition', action_list: 'Review next observation', contingency: 'Escalate if worse',
@@ -52,6 +56,12 @@ try {
     assert(patch.status === 200, `Outgoing doctor must write findings: ${patch.status}`);
     assert((await call(`/ipass/items/${item.id}/sign`, outgoing, 'POST')).status === 200, 'Item signing failed');
   }
+  const overlapSigned = await call('/ipass', replacement, 'POST', { ward });
+  assert(overlapSigned.status === 201 && (await overlapSigned.clone().json() as Detail).items.length === 3,
+    'Another doctor may create a handover while these patients have signed items');
+  const overlapSignedId = (await overlapSigned.json() as Detail).session.id;
+  assert((await call(`/ipass/${overlapDraftId}/cancel`, unavailable, 'POST')).status === 200, 'Cancelling overlapping draft failed');
+  assert((await call(`/ipass/${overlapSignedId}/cancel`, replacement, 'POST')).status === 200, 'Cancelling overlapping signed-session draft failed');
   assert((await call(`${sessionPath}/send`, outgoing, 'POST')).status === 200, 'Sending shared handover failed');
   const queue = await call('/ipass', replacement);
   assert(queue.status === 200 && (await queue.json() as { id: string }[]).some((row) => row.id === detail.session.id),
