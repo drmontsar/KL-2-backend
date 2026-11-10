@@ -10,7 +10,7 @@ The server runs on port 3001 by default. Set the `PORT` environment variable to 
 - OpenAPI spec: `GET /openapi.json`
 - Interactive docs: `GET /docs`
 
-Start the server with `bun run server`.
+Start the server with `bun run dev`.
 
 ## Operations
 
@@ -139,6 +139,10 @@ Routine home, referral, and LAMA discharges must use the staged workflow; the le
 ### Shift handovers
 
 Doctor handover is now a **shared duty-doctor I-PASS queue**, not a transfer of individually assigned patients. `POST /ipass` accepts optional `ward` (no `incoming_doctor_id`) and snapshots all active patients in that ward, including **incoming** patients (each item exposes `arrival_status`), or all wards when omitted. The same patient may be included in multiple unfinished handovers; overlapping drafts and signed items do not block creation. Drafts are visible only to their author. The outgoing duty doctor writes findings (`patient_summary`, `action_list`, `contingency`), signs **each** item at `/ipass/items/{id}/sign`, then sends with `/ipass/{id}/send`. `GET /ipass` shows sent sessions to every enabled duty doctor, so DD3 can see and complete DD1's handover if DD2 is absent; DD1 cannot accept their own items. The reviewer uses `POST /ipass/items/{id}/accept` with required `receiver_view` and (for watcher/unstable cases) `readback`. Each item records `reviewed_by`, `receiver_view`, and `accepted_at`; the session completes when **all** items are reviewed, potentially by different doctors. If the chart changed since signing, acceptance returns 409 until the reviewer explicitly rechecks it and sends `acknowledge_stale: true` (recorded as `stale_acknowledged`). Questions are shared within the session. Accepted items do **not** change patient assignments. Outgoing doctors may refresh changed pending items. New legacy `POST /handover-sessions` creation returns 409; existing legacy sessions remain viewable/acknowledgeable.
+
+Duty-doctor draft updates (`PATCH /ipass/items/{id}`) support `action_tasks`: up to 100 entries with a unique UUID `id`, `text`, `done`, `high_priority`, `role` (`DD`, `Nurse`, `Consultant`) and `timing` (`Shift End`, `Now`, `Next Shift`). These are handover checklist entries, **not clinical orders**. Saving tasks requires `expected_item_revision`; a stale item returns 409 without overwriting a newer checklist. Items expose `item_revision` and nullable `action_tasks` (legacy text remains supported). The server serializes tasks into `action_list` for existing readers. Text-only edits preserve tasks when the action text is unchanged and clear them when it changes. Draft saves and sent-item refreshes increment `item_revision`.
+
+Draft updates may also include `severity` with required `expected_revision`. The admission severity, admission revision, handover snapshot and audit entry are updated atomically under locks; stale chart revisions return 409. This is a chart change, not a cosmetic handover override. `GET /ipass/{id}` additionally exposes UHID, age, sex, admission date, latest NEWS2 and current treating consultant for the shared queue. Apply migration `059_ipass_action_tasks.sql` before deploying these task controls.
 
 Nurse bedside handovers use the equivalent `/nurse-handover` session endpoints. Snapshots include observations, assessment, orders, medicines, infusion events, tasks, and fluid balance. Receiving nurses must submit the complete bedside checklist to `/nurse-handover/items/{id}/accept`; discrepancies can be recorded. Questions and cancellation are supported.
 

@@ -381,7 +381,7 @@ export async function getAdmissionForUser(id: string, user: UserCtx): Promise<Ad
   return row ?? null;
 }
 
-type ActiveAdmissionRow = Admission & { patient_name: string; patient_dob: string };
+type ActiveAdmissionRow = Admission & { patient_name: string; patient_dob: string; intake_pending?: boolean };
 
 const SEVERITY_ORDER = db`CASE a.severity WHEN 'unstable' THEN 0 WHEN 'watcher' THEN 1 ELSE 2 END`;
 
@@ -392,7 +392,11 @@ export function listAdmissionsForUser(
 ): Promise<ActiveAdmissionRow[]> {
   const { scope, ward } = opts ?? {};
   const base = db`
-    SELECT a.*, p.name AS patient_name, p.dob AS patient_dob
+    SELECT a.*, p.name AS patient_name, p.dob AS patient_dob,
+      (a.arrival_status = 'incoming' OR EXISTS (
+        SELECT 1 FROM clinical.admission_checklist_items i
+        WHERE i.admission_id = a.id AND i.status = 'pending'
+      )) AS intake_pending
     FROM clinical.admissions a
     JOIN clinical.patients p ON p.id = a.patient_id
     WHERE a.status = 'active'

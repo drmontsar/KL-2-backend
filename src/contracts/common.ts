@@ -91,6 +91,7 @@ export const ShiftEventSchema = z.object({
 });
 
 export const ActiveAdmissionSchema = AdmissionSchema.extend({
+  intake_pending: z.boolean().optional(),
   patient_name: z.string(),
   patient_dob: z.string(),
 });
