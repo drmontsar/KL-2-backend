@@ -55,7 +55,19 @@ export async function getIpassSession(id: string, actor_user_id: string) {
 export async function listIpassItems(id: string) {
   return db<
     Item[]
-  >`SELECT * FROM clinical.ipass_items WHERE session_id = ${id} ORDER BY CASE severity WHEN 'unstable' THEN 0 WHEN 'watcher' THEN 1 ELSE 2 END, patient_name`.catch(
+  >`SELECT i.*, p.uhid, extract(year from age(p.dob))::int AS age, p.sex,
+      a.admitted_at, n.news2_score, consultant.name AS consultant_name
+    FROM clinical.ipass_items i
+    JOIN clinical.admissions a ON a.id = i.admission_id
+    JOIN clinical.patients p ON p.id = a.patient_id
+    LEFT JOIN clinical.latest_news2 n ON n.admission_id = a.id
+    LEFT JOIN LATERAL (
+      SELECT u.name FROM clinical.staff_assignments sa JOIN staff.users u ON u.id = sa.user_id
+      WHERE sa.admission_id = a.id AND sa.assignment_type = 'treating_consultant' AND sa.ends_at IS NULL
+      ORDER BY sa.starts_at DESC, sa.id DESC LIMIT 1
+    ) consultant ON true
+    WHERE i.session_id = ${id}
+    ORDER BY CASE i.severity WHEN 'unstable' THEN 0 WHEN 'watcher' THEN 1 ELSE 2 END, i.patient_name`.catch(
     rethrowDatabaseError,
   );
 }
@@ -71,8 +83,34 @@ export async function getOutgoingIpassItemOwner(id: string) {
 export async function updateIpassItem(body: ItemBodyInput, id: string, actor_user_id: string) {
   return db
     .begin(async (tx) => {
+      const [chart] = await tx<{ admission_id: string; revision: string; severity: Item['severity']; item_revision: string }[]>`
+        SELECT a.id AS admission_id, a.revision, a.severity, i.item_revision
+        FROM clinical.admissions a
+        JOIN clinical.ipass_items i ON i.admission_id = a.id
+        JOIN clinical.ipass_sessions s ON s.id = i.session_id
+        WHERE i.id = ${id} AND a.status = 'active' AND s.status = 'draft' AND s.outgoing_doctor_id = ${actor_user_id}
+        FOR UPDATE OF a, i, s
+      `;
+      if (!chart) return null;
+      if (body.expected_item_revision !== undefined && String(chart.item_revision) !== String(body.expected_item_revision)) return null;
+      if (body.severity !== undefined) {
+        if (String(chart.revision) !== String(body.expected_revision)) return null;
+        if (chart.severity !== body.severity) {
+          const [admission] = await tx`
+            UPDATE clinical.admissions SET severity = ${body.severity}, revision = revision + 1
+            WHERE id = ${chart.admission_id} RETURNING *
+          `;
+          await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after)
+            VALUES (${actor_user_id}, 'update', 'clinical.admissions', ${chart.admission_id}, ${tx.json(admission as Json)})`;
+        }
+      }
       const [item] = await tx<Item[]>`
-      UPDATE clinical.ipass_items i SET patient_summary = ${body.patient_summary}, action_list = ${body.action_list}, contingency = ${body.contingency},
+      UPDATE clinical.ipass_items i SET patient_summary = ${body.patient_summary},
+        action_list = ${body.action_tasks === undefined ? body.action_list : body.action_tasks.length ? body.action_tasks.map((task) => `${task.done ? '☑' : '☐'} ${task.high_priority ? '[HIGH] ' : ''}${task.text} · ${task.role} · ${task.timing}`).join('\n') : 'No outstanding handover actions'},
+        action_tasks = CASE WHEN ${body.action_tasks === undefined} THEN
+          CASE WHEN i.action_list = ${body.action_list} THEN i.action_tasks ELSE NULL END
+          ELSE ${body.action_tasks === undefined ? null : tx.json(body.action_tasks as Json)} END,
+        item_revision = i.item_revision + 1, contingency = ${body.contingency},
         severity = a.severity, arrival_status = a.arrival_status, snapshot_revision = a.revision, ward = a.ward, bed = a.bed, status = 'draft', signed_at = NULL
       FROM clinical.ipass_sessions s, clinical.admissions a
       WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'draft' AND s.outgoing_doctor_id = ${actor_user_id}
@@ -93,7 +131,7 @@ export async function signIpassItem(id: string, actor_user_id: string) {
       FROM clinical.ipass_sessions s, clinical.admissions a
       WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'draft' AND s.outgoing_doctor_id = ${actor_user_id}
         AND i.status = 'draft' AND a.id = i.admission_id AND a.status = 'active' AND a.arrival_status = i.arrival_status
-        AND a.revision = i.snapshot_revision AND length(trim(i.patient_summary)) > 0 AND length(trim(i.action_list)) > 0 AND length(trim(i.contingency)) > 0 RETURNING i.*
+        AND a.revision = i.snapshot_revision RETURNING i.*
     `;
       if (item)
         await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'sign', 'clinical.ipass_items', ${id}, ${tx.json(item as unknown as Json)})`;
@@ -231,7 +269,8 @@ export async function refreshIpassItem(body: ItemBodyInput, id: string, actor_us
     .begin(async (tx) => {
       const [item] = await tx<Item[]>`
       UPDATE clinical.ipass_items i SET patient_summary = ${body.patient_summary}, action_list = ${body.action_list}, contingency = ${body.contingency},
-        severity = a.severity, arrival_status = a.arrival_status, snapshot_revision = a.revision, ward = a.ward, bed = a.bed, signed_at = now()
+        severity = a.severity, arrival_status = a.arrival_status, snapshot_revision = a.revision, ward = a.ward, bed = a.bed, signed_at = now(),
+        action_tasks = CASE WHEN action_list = ${body.action_list} THEN action_tasks ELSE NULL END, item_revision = i.item_revision + 1
       FROM clinical.ipass_sessions s, clinical.admissions a
       WHERE i.id = ${id} AND s.id = i.session_id AND s.status = 'sent' AND s.outgoing_doctor_id = ${actor_user_id} AND i.status = 'signed'
         AND a.id = i.admission_id AND a.status = 'active'

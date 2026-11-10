@@ -50,10 +50,59 @@ try {
     'Another doctor may create a handover while these patients are already in a draft');
   const overlapDraftId = (await overlapDraft.json() as Detail).session.id;
   for (const item of detail.items) {
-    const patch = await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', {
-      patient_summary: 'Findings and current condition', action_list: 'Review next observation', contingency: 'Escalate if worse',
+    // Flow testing permits signing with no clinical content, but retains chart/actor checks.
+    const emptySave = await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', {
+      patient_summary: '', action_list: '', contingency: '',
     });
+    assert(emptySave.status === 200, 'Empty draft saves must be allowed for flow testing');
+    assert((await call(`/ipass/items/${item.id}/sign`, consultantToken, 'POST')).status === 403,
+      'Empty content must not bypass authorization');
+    assert((await call(`/ipass/items/${item.id}/sign`, outgoing, 'POST')).status === 200,
+      'Empty handovers must be markable as ready for flow testing');
+    const fields = {
+      patient_summary: 'Findings and current condition', action_list: 'Review next observation', contingency: 'Escalate if worse',
+    };
+    if (item.id === detail.items[0].id) {
+      const [before] = await db<{ revision: string; severity: string }[]>`SELECT revision, severity FROM clinical.admissions WHERE id = ${item.admission_id}`;
+      const nextSeverity = before.severity === 'unstable' ? 'watcher' : 'unstable';
+      const severityChange = { ...fields, severity: nextSeverity, expected_revision: Number(before.revision) };
+      assert((await call(`/ipass/items/${item.id}`, consultantToken, 'PATCH', severityChange)).status === 403,
+        'Consultants must not change handover or chart severity');
+      assert((await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', { ...severityChange, expected_revision: Number(before.revision) + 1 })).status === 409,
+        'Stale chart severity writes must fail');
+      const [unchanged] = await db<{ revision: string; severity: string }[]>`SELECT revision, severity FROM clinical.admissions WHERE id = ${item.admission_id}`;
+      assert(String(unchanged.revision) === String(before.revision) && unchanged.severity === before.severity,
+        'A rejected severity edit must not update the clinical chart');
+      const changed = await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', severityChange);
+      assert(changed.status === 200, `Severity change failed: ${changed.status} ${await changed.clone().text()}`);
+      const saved = await changed.json() as { severity: string; snapshot_revision: string };
+      const [chart] = await db<{ revision: string; severity: string }[]>`SELECT revision, severity FROM clinical.admissions WHERE id = ${item.admission_id}`;
+      assert(chart.severity === nextSeverity && saved.severity === nextSeverity && Number(chart.revision) === Number(before.revision) + 1 && String(chart.revision) === String(saved.snapshot_revision),
+        'Severity must update both the chart and handover snapshot atomically');
+    }
+    const patch = await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', fields);
     assert(patch.status === 200, `Outgoing doctor must write findings: ${patch.status}`);
+    const initialItem = await patch.json() as { item_revision: string | number };
+    const taskId = crypto.randomUUID();
+    const task = { id: taskId, text: 'Review repeat blood count', done: true, high_priority: true, role: 'DD', timing: 'Shift End' };
+    const taskBody = { ...fields, action_tasks: [task], expected_item_revision: Number(initialItem.item_revision) };
+    assert((await call(`/ipass/items/${item.id}`, consultantToken, 'PATCH', taskBody)).status === 403,
+      'Consultants cannot edit handover tasks');
+    assert((await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', { ...taskBody, expected_item_revision: undefined })).status === 400,
+      'Structured task saves require an item revision');
+    const taskSave = await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', taskBody);
+    assert(taskSave.status === 200, `Task save failed: ${taskSave.status} ${await taskSave.clone().text()}`);
+    const taskResult = await taskSave.json() as { action_tasks: typeof task[]; item_revision: string | number; action_list: string };
+    assert(taskResult.action_tasks[0]?.done && taskResult.action_tasks[0]?.high_priority && taskResult.action_tasks[0]?.id === taskId,
+      'Completion, priority and task identity must persist');
+    assert(taskResult.action_list.includes('☑ [HIGH] Review repeat blood count · DD · Shift End'),
+      'Legacy readers must see the structured tasks in action_list');
+    assert((await call(`/ipass/items/${item.id}`, outgoing, 'PATCH', taskBody)).status === 409,
+      'Stale task saves must not overwrite a newer checklist');
+    const reopened = await call(sessionPath, outgoing);
+    const reopenedDetail = await reopened.json() as { items: { id: string; action_tasks: typeof task[] }[] };
+    assert(reopenedDetail.items.find((entry) => entry.id === item.id)?.action_tasks[0]?.done,
+      'Reopening the session must retain task completion');
     assert((await call(`/ipass/items/${item.id}/sign`, outgoing, 'POST')).status === 200, 'Item signing failed');
   }
   const overlapSigned = await call('/ipass', replacement, 'POST', { ward });
