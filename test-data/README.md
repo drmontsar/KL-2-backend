@@ -33,7 +33,7 @@ Stop the API, then run:
 
 ```bash
 bun run reset:demo
-bun run server
+bun run dev
 ```
 
 This deletes every row in the application schemas (`organization`, `staff`, `clinical`, `finance`, `opd`, `forms`, and `test_data`), including users, sessions, audit records, and data from previous generators. It preserves schema definitions and migration history. Tables in other schemas are not reset; external foreign-key dependencies stop the reset rather than being deleted through CASCADE. Use this only for disposable local test data.

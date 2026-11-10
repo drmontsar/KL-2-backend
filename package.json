@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "server": "bun run src/main.ts",
+    "dev": "bun run src/main.ts",
     "migrate": "bun run src/db/migrate.ts",
     "seed": "bun run src/db/seed-test-data.ts",
     "seed:care-area": "bun run src/db/seed-care-area.ts",

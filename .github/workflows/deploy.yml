@@ -39,6 +39,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             set -e
+            umask 077
             mkdir -p /opt/klinik
             cd /opt/klinik
 
@@ -49,7 +50,10 @@ jobs:
             CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
             EOF
 
-            docker pull ghcr.io/${{ github.repository_owner }}/klinik-backend:${{ github.sha }}
+            docker_config="$(mktemp -d)"
+            trap 'rm -rf "$docker_config"' EXIT
+            printf '%s' '${{ secrets.GITHUB_TOKEN }}' | DOCKER_CONFIG="$docker_config" docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            DOCKER_CONFIG="$docker_config" docker pull ghcr.io/${{ github.repository_owner }}/klinik-backend:${{ github.sha }}
             docker stop klinik-backend || true
             docker rm klinik-backend || true
             docker run -d \

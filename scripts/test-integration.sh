@@ -60,7 +60,7 @@ NODE_ENV=test bun run seed >/dev/null
 bun run test/test-data-integration.ts
 NODE_ENV=test bun run test/fixtures/legacy/seed.ts >/dev/null
 NODE_ENV=test bun run test/integration/migrations.ts
-NODE_ENV=test PORT="$server_port" bun run server >/tmp/klinik-security-server.log 2>&1 &
+NODE_ENV=test PORT="$server_port" bun run dev >/tmp/klinik-security-server.log 2>&1 &
 server_pid=$!
 
 for _ in $(seq 1 30); do
