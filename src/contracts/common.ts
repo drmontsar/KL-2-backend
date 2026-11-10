@@ -20,6 +20,7 @@ export const UserSchema = z.object({
   registration_number: z.string().nullable(),
   specialization: z.string().nullable(),
   phone: z.string().nullable(),
+  email: z.string().email().nullable().optional(),
   current_area: z.string().nullable(),
   last_seen_at: z.string().nullable(),
   created_at: z.string(),

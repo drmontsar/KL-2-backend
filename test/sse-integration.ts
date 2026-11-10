@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import postgres from 'postgres';
 import { notifChannel } from '../src/db/queries/notifications';
+import { emailForFixturePhone } from './demo_login';
 
 assert.equal(process.env.DISPOSABLE_DATABASE, '1');
 assert.equal(process.env.NODE_ENV, 'test');
@@ -37,10 +38,10 @@ try {
     .find((group) => group.table === 'staff.users')!
     .rows.find((user) => user.job_role === 'staff_nurse')!;
   const doctor = (await (
-    await request('/auth/verify', undefined, { phone: '1112223330', otp: 'test' })
+    await request('/auth/login', undefined, { email: emailForFixturePhone('1112223330'), password: 'password' })
   ).json()) as { token: string };
   const nurse = (await (
-    await request('/auth/verify', undefined, { phone: nurseFixture.phone, otp: 'test' })
+    await request('/auth/login', undefined, { email: emailForFixturePhone(nurseFixture.phone), password: 'password' })
   ).json()) as { token: string; user: { id: string } };
   const admissions = (await (await request('/admissions?scope=mine', doctor.token)).json()) as {
     id: string;

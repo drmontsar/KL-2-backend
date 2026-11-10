@@ -4,6 +4,8 @@
 import postgres from 'postgres';
 import { config } from '../../../src/config';
 import { logger } from '../../../src/logger';
+import { demoEmail } from '../../../src/db/demo_email';
+import { hashPassword } from '../../../src/security/password';
 
 if (process.env.NODE_ENV !== 'test' || process.env.DISPOSABLE_DATABASE !== '1') {
   throw new Error('Legacy fixtures require a disposable integration-test database');
@@ -380,7 +382,16 @@ await db`
         specialization = EXCLUDED.specialization,
         phone = EXCLUDED.phone
 `;
-logger.info('Seeded users');
+const fixtureHash = await hashPassword('password');
+const fixtureUsers = await db<{ id: string; name: string }[]>`
+  SELECT id, name FROM staff.users WHERE id IN (${DOCTOR_ID}, ${DOCTOR_ID2}, ${DOCTOR_ID3}, ${NURSE_ID}, ${ADMIN_ID})
+`;
+for (const user of fixtureUsers) await db`
+  INSERT INTO staff.user_credentials (user_id, email, password_hash)
+  VALUES (${user.id}, ${demoEmail(user.name)}, ${fixtureHash})
+  ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, password_hash = EXCLUDED.password_hash
+`;
+logger.info('Seeded users and demo credentials');
 
 // 3 — Build 100 patient records
 const patients = Array.from({ length: 100 }, (_, i) => {

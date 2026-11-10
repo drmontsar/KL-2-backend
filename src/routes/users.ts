@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { hasPermission } from '../authorization';
 import { DoctorPresenceSchema, ErrorSchema, IdParam, UserSchema } from '../contracts/common';
 import type { User } from '../db/queries/users';
+import { changePassword, setUserCredentials } from '../db/queries/auth';
 import {
   createUser,
   disableUser,
@@ -30,7 +31,15 @@ const CreateUserBody = z.object({
     .optional(),
   registration_number: z.string().optional(),
   specialization: z.string().optional(),
-  phone: z.string().trim().min(6),
+  phone: z.string().trim().min(6).optional(),
+  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  password: z.string().min(12).max(128),
+});
+
+const CredentialsBody = CreateUserBody.pick({ email: true, password: true });
+const ChangePasswordBody = z.object({
+  current_password: z.string().min(1),
+  new_password: z.string().min(12).max(128),
 });
 
 const SetAreaBody = z.object({
@@ -67,7 +76,7 @@ usersRouter.openapi(
     return c.json(
       hasPermission(viewer, 'staff.private.read')
         ? users
-        : users.map((user) => ({ ...user, phone: null })),
+        : users.map((user) => ({ ...user, phone: null, email: null })),
       200,
     );
   },
@@ -92,7 +101,7 @@ usersRouter.openapi(
       },
       409: {
         content: { 'application/json': { schema: ErrorSchema } },
-        description: 'Phone already registered',
+        description: 'Phone or email already registered',
       },
     },
   }),
@@ -109,6 +118,45 @@ usersRouter.openapi(
       : data.role;
     const user = await createUser({ ...data, role });
     return c.json(user, 201);
+  },
+);
+
+usersRouter.openapi(
+  createRoute({
+    method: 'put', path: '/{id}/credentials', tags: ['Users'],
+    request: { params: IdParam, body: { content: { 'application/json': { schema: CredentialsBody } } } },
+    responses: {
+      200: { content: { 'application/json': { schema: UserSchema } }, description: 'Credentials assigned; previous sessions revoked' },
+      403: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Admin access required' },
+      404: { content: { 'application/json': { schema: ErrorSchema } }, description: 'User not found' },
+      409: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Email already in use' },
+    },
+  }),
+  async (c) => {
+    if (!hasPermission(c.get('user'), 'users.manage'))
+      return c.json({ error: 'admin access required' }, 403);
+    const { id } = c.req.valid('param');
+    const { email, password } = c.req.valid('json');
+    const user = await setUserCredentials(id, email, password, c.get('user').id);
+    if (!user) return c.json({ error: 'user not found' }, 404);
+    return c.json(user, 200);
+  },
+);
+
+usersRouter.openapi(
+  createRoute({
+    method: 'post', path: '/me/password', tags: ['Users'],
+    request: { body: { content: { 'application/json': { schema: ChangePasswordBody } } } },
+    responses: {
+      204: { description: 'Password changed; sessions revoked' },
+      403: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Current password incorrect' },
+    },
+  }),
+  async (c) => {
+    const { current_password, new_password } = c.req.valid('json');
+    if (!(await changePassword(c.get('user').id, current_password, new_password)))
+      return c.json({ error: 'current password incorrect' }, 403);
+    return c.body(null, 204);
   },
 );
 
@@ -219,7 +267,7 @@ usersRouter.openapi(
     return c.json(
       hasPermission(viewer, 'staff.private.read')
         ? doctors
-        : doctors.map((doctor) => ({ ...doctor, phone: null })),
+        : doctors.map((doctor) => ({ ...doctor, phone: null, email: null })),
       200,
     );
   },

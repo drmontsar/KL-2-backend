@@ -79,17 +79,15 @@ Note draft updates require `expected_revision`. This applies to both `/notes/{id
 
 Nursing task completion requires `expected_due_at`. Use the due time from the task response. The database comparison uses the millisecond precision that the JSON response exposes.
 
-User creation requires a phone number. A duplicate phone returns HTTP 409. Patient updates accept an empty string to clear a phone, address, or ABHA value and its corresponding primary identity record.
+Staff creation requires a unique email and password; phone is optional contact data. Duplicate email or phone returns HTTP 409. Patient updates accept an empty string to clear a phone, address, or ABHA value and its corresponding primary identity record.
 
 Migration `051_clinical_revisions.sql` advances admission revisions for clinical content changes. It also invalidates existing handover snapshots. After this migration, refresh a stale I-PASS item before acceptance. Clients must retrieve the latest admission revision after a clinical change before a revision-sensitive mutation.
 
 The frontend note-update hook and nursing-task action include the new concurrency inputs. Other clients must adopt these inputs too.
 
-## MVP authentication
+## Authentication
 
-Development and test retain the dummy OTP flow. Any non-empty OTP value works. No SMS provider or actual OTP verification exists.
-
-Production rejects the dummy request and verification endpoints with HTTP 503. A deployed MVP that uses `NODE_ENV=production` needs an explicit authentication decision before deployment. Do not treat the dummy flow as production authentication.
+Staff log in with email and password at `POST /auth/login`. Password hashes are stored separately from public staff rows using scrypt; legacy OTP-issued sessions are invalidated by migration 060. Administrators create users or provision credentials for existing staff, and the bootstrap CLI configures the first production administrator. No public registration, SMS provider, or OTP verification exists. Local fixtures use shared password `password` only on disposable local/test databases; do not seed them in production.
 
 ## Verification
 

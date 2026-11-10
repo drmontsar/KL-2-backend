@@ -7,10 +7,16 @@ const DOCTOR_1 = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 const DOCTOR_2 = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12';
 
 async function login(phone: string) {
-  const response = await fetch(`${baseUrl}/auth/verify`, {
+  const sql = postgres(process.env.DATABASE_URL!);
+  const [account] = await sql<{ email: string }[]>`
+    SELECT c.email FROM staff.users u JOIN staff.user_credentials c ON c.user_id = u.id WHERE u.phone = ${phone}
+  `;
+  await sql.end();
+  if (!account) throw new Error(`no test credentials for ${phone}`);
+  const response = await fetch(`${baseUrl}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ phone, otp: 'development' }),
+    body: JSON.stringify({ email: account.email, password: 'password' }),
   });
   if (!response.ok) throw new Error(`login failed: ${response.status} ${await response.text()}`);
   return response.json() as Promise<{ token: string; user: { id: string; role: string } }>;
@@ -53,20 +59,24 @@ const roleMutation = await fetch(`${baseUrl}/auth/request`, {
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ phone: '+44 7700 900321', name: 'Attacker', role: 'nurse' }),
 });
-assert(roleMutation.ok, `OTP request returned ${roleMutation.status}`);
+assert(roleMutation.status === 404, `public OTP registration still exists (${roleMutation.status})`);
+const admin = await login('+44 7700 900999');
 
 const registrationPhone = '+44 7700 901234';
-const registration = await fetch(`${baseUrl}/auth/request`, {
+const registration = await request('/users', admin.token, {
   method: 'POST',
-  headers: { 'content-type': 'application/json' },
   body: JSON.stringify({
     phone: registrationPhone,
     name: 'Development Clinician',
     role: 'doctor',
+    email: 'development+clinician@klinik.com',
+    password: 'long-test-password',
   }),
 });
 assert(registration.ok, `development registration returned ${registration.status}`);
-const registeredDoctor = await login(registrationPhone);
+const registeredDoctor = await request('/auth/login', undefined, {
+  method: 'POST', body: JSON.stringify({ email: 'development+clinician@klinik.com', password: 'long-test-password' }),
+}).then((response) => response.json()) as { token: string; user: { role: string } };
 assert(
   registeredDoctor.user.role === 'doctor',
   'development registration created the wrong role'
@@ -76,8 +86,7 @@ const doctor1 = await login('+44 7700 900321');
 const doctor2 = await login('+44 7700 900322');
 const doctor3 = await login('+44 7700 900323');
 const nurse = await login('+44 7700 900654');
-const admin = await login('+44 7700 900999');
-assert(doctor1.user.id === DOCTOR_1 && doctor1.user.role === 'doctor', 'OTP request changed user identity or role');
+assert(doctor1.user.id === DOCTOR_1 && doctor1.user.role === 'doctor', 'login changed user identity or role');
 assert(admin.user.role === 'admin', 'administrator seed role is invalid');
 
 const doctor1AdmissionsResponse = await request('/admissions?scope=mine', doctor1.token);

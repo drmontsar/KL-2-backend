@@ -6,6 +6,8 @@ import { calculateNews2 } from '../clinical/news2';
 import { buildNursingCarePlan } from '../clinical/nursing';
 import { AssessmentBody } from '../contracts/nursing';
 import { config } from '../config';
+import { hashPassword } from '../security/password';
+import { demoEmail } from './demo_email';
 import { db } from './index';
 import { getNursingHandoverSnapshot } from './queries/nurse_handover';
 
@@ -421,6 +423,16 @@ async function main() {
         `;
         inserted++;
       }
+    }
+    // Public demo credentials are generated only for local/test seed data.
+    const demoHash = await hashPassword('password');
+    for (const row of groups.find((group) => group.table === 'staff.users')?.rows ?? []) {
+      const email = demoEmail(String(row.name));
+      await tx`
+        INSERT INTO staff.user_credentials (user_id, email, password_hash)
+        VALUES (${String(row.id)}, ${email}, ${demoHash})
+        ON CONFLICT (user_id) DO NOTHING
+      `;
     }
     return { inserted, preserved };
   });
