@@ -1,5 +1,7 @@
 # KliniK backend
 
+GitHub Actions runs CI; deployment is not configured yet.
+
 API and database for the KliniK doctor frontend in `../KL-2-doc`.
 
 The standalone service uses `src/main.ts` for Bun startup and `src/app.ts` for application construction. See [the architecture guide](docs/architecture.md) for module boundaries and reference patterns.
