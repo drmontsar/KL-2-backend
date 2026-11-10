@@ -9,7 +9,7 @@ bun install
 cp .env.example .env
 docker compose up -d
 bun run seed  # applies migrations and inserts the portable fixture data
-bun run server
+bun run dev
 ```
 
 The API runs at `http://localhost:3001`; OpenAPI docs are at `/docs`.
@@ -22,7 +22,7 @@ If the database contains mixed old and new demo data, stop the API and run:
 
 ```bash
 bun run reset:demo
-bun run server
+bun run dev
 ```
 
 **Warning:** `reset:demo` deletes all local application data, including users, sessions, patients, clinical records, catalogues, and audit records. It keeps the schema and migration history, then loads only the current canonical fixtures. Existing logins expire; sign in again after restarting the API.

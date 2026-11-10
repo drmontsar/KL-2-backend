@@ -21,8 +21,8 @@ jobs:
         options: >-
           --health-cmd="pg_isready -U klinik -d klinik"
           --health-interval=10s
-          --timeout=5s
-          --retries=5
+          --health-timeout=5s
+          --health-retries=5
 
     env:
       DATABASE_URL: postgres://klinik:klinik@127.0.0.1:5432/klinik
@@ -40,7 +40,7 @@ jobs:
           bun-version: latest
 
       - name: Install deps
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Type check
         run: bun run check
