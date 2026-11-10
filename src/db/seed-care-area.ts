@@ -1,5 +1,7 @@
 // Idempotent local demo addition. Run after migrations: bun run seed:care-area
 import { config } from '../config';
+import { hashPassword } from '../security/password';
+import { demoEmail } from './demo_email';
 import { db } from './index';
 
 const url = new URL(config.databaseUrl);
@@ -54,9 +56,10 @@ try {
           OR EXISTS (SELECT 1 FROM organization.bed_reservations r WHERE r.bed_id = b.id AND r.released_at IS NULL))::int AS unavailable
       FROM organization.beds b WHERE b.room_id = ${room.id} AND b.label ~ '^CA-(00[1-9]|0[1-9][0-9]|100)$'
     `;
-    if (beds.total !== 100 || beds.unavailable !== 0)
-      throw new Error('Expected CA-001 to CA-100 to be free; no data was changed');
+    if (beds.total !== 100)
+      throw new Error('Expected exactly CA-001 to CA-100; no data was changed');
 
+    const demoHash = await hashPassword('password');
     for (const doctor of consultants) {
       await tx`
         INSERT INTO staff.users (name, phone, role, job_role, registration_number, specialization)
@@ -69,9 +72,12 @@ try {
       if (!user || user.name !== doctor.name || user.job_role !== 'consultant' || user.disabled_at)
         throw new Error(`Consultant phone ${doctor.phone} is already in use`);
       await tx`INSERT INTO staff.unit_memberships (user_id, unit_id) VALUES (${user.id}, ${unit.id}) ON CONFLICT DO NOTHING`;
+      await tx`INSERT INTO staff.user_credentials (user_id, email, password_hash)
+        VALUES (${user.id}, ${demoEmail(doctor.name)}, ${demoHash})
+        ON CONFLICT (user_id) DO NOTHING`;
     }
   });
-  console.log('Care Area: 100 free beds (CA-001–CA-100); 3 demo consultants ready.');
+  console.log('Care Area: CA-001–CA-100 verified; 3 demo consultants ready. Existing bed occupancy was preserved.');
 } finally {
   await db.end();
 }

@@ -1,4 +1,6 @@
 import postgres from 'postgres';
+import { demoEmail } from '../src/db/demo_email';
+import { hashPassword } from '../src/security/password';
 
 const baseUrl = process.env.BASE_URL;
 if (!baseUrl || !process.env.DATABASE_URL) throw new Error('BASE_URL and DATABASE_URL are required');
@@ -8,8 +10,12 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 async function login(phone: string): Promise<string> {
-  const response = await fetch(`${baseUrl}/auth/verify`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone, otp: 'demo' }),
+  const [account] = await sql<{ email: string }[]>`
+    SELECT c.email FROM staff.users u JOIN staff.user_credentials c ON c.user_id = u.id WHERE u.phone = ${phone}
+  `;
+  if (!account) throw new Error(`no credentials for ${phone}`);
+  const response = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: account.email, password: 'password' }),
   });
   if (!response.ok) throw new Error(`login failed: ${response.status}`);
   return (await response.json() as { token: string }).token;
@@ -28,6 +34,9 @@ const ids = await sql.begin(async (tx) => {
       ('Dashboard Nurse', 'nurse', 'staff_nurse', '+44 7700 902004', NULL),
       ('Dashboard Consultant', 'doctor', 'consultant', '+44 7700 902005', 'Cardiology') RETURNING id, name
   `;
+  const demoHash = await hashPassword('password');
+  for (const user of users) await tx`INSERT INTO staff.user_credentials (user_id, email, password_hash)
+    VALUES (${user.id}, ${demoEmail(user.name)}, ${demoHash})`;
   const userId = (name: string) => users.find((user) => user.name === name)!.id;
   const doctor = userId('Dashboard Doctor'); const other = userId('Dashboard Other Doctor');
   const outside = userId('Dashboard Outside Doctor'); const nurse = userId('Dashboard Nurse');

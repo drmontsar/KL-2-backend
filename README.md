@@ -31,7 +31,7 @@ bun run dev
 
 The command is restricted to a local `klinik` database, the `klinik` database user, and development/test mode. Migrations run first. The data reset and reload share one transaction; a failed fixture insert restores the previous application data. Operational timestamps are moved to the reset time, preserving their relative intervals. Birth dates and insurance dates do not move.
 
-**Test login: Bruce Wayne — `1112223330`**. He is an enabled duty doctor with an active shift and coverage access to both sample admissions. Development/test still accepts any non-empty OTP.
+**Test login: Bruce Wayne — `bruce+wayne@klinik.com` / `password`**. He is an enabled duty doctor. These shared demo credentials are for local/test fixtures only.
 
 ## Portable test data
 
@@ -39,9 +39,7 @@ The canonical dataset is in `test-data/`: `manifest.json` defines the file order
 
 The loader only inserts missing fixture records and never overwrites existing records. It records ownership in `test_data.seed_records`, rejects collisions with untracked records, and is safe to rerun. If you edit a data file, the new values are used on a fresh database; existing fixture records are deliberately not updated. Fresh additive loads use the fixed `snapshot_at` baseline for reproducibility. Reset selects the current clock; later additive loads preserve that selected clock.
 
-Test logins include Bruce Wayne `1112223330`, duty doctor `+1 202 555 0111`, consultant `+1 202 555 0112`, nurse `+1 202 555 0113`, and administrator `+1 202 555 0114`. Development and test retain the dummy authentication flow. Any non-empty OTP works. Production rejects this dummy flow with HTTP 503. No real OTP provider exists.
-
-If your own duty-doctor login needs access to existing admissions, run `bun run assign:test-user -- <phone>`. This grants coverage without replacing the primary doctor; it does not generate data.
+Demo accounts include Bruce Wayne (`bruce+wayne@klinik.com`), duty doctor (`arjun+mehta@klinik.com`), consultant (`priya+shah@klinik.com`), nurse (`anita+rao@klinik.com`), and administrator (`kiran+patel@klinik.com`). The address is their first and second name (ignoring `Dr.`), joined with a literal `+` and followed by `@klinik.com`. All use the local/test password above. Production has no default password; provision the first administrator with `ADMIN_EMAIL` and `ADMIN_PASSWORD` using `bun run auth:bootstrap-admin` after migrations, then let that administrator create staff or assign credentials. The migration expires old OTP-issued sessions.
 
 Existing historical records from previous seeds are preserved. The old generators now live under `test/fixtures/legacy/` and run only as integration fixtures, not as setup commands. The fixture data is fictional and is not a validated clinical or legal reference.
 

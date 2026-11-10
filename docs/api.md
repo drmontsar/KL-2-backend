@@ -18,9 +18,13 @@ Start the server with `bun run dev`.
 
 ## Authentication
 
-Call `POST /auth/request` with `phone`, then call `POST /auth/verify` with `phone` and `otp`. Only pre-registered, active staff can verify. In development/test, new accounts may use `role: "consultant"` in `/auth/request`; the response identifies consultants by `user.job_role: "consultant"`. Duty doctors may select `shift: "morning" | "afternoon" | "night"` in `/auth/verify`. The choice is saved on the session and echoed in the response; it is informational and does not restrict patient access. Shift times are 08:00–14:00, 14:00–20:00 and 20:00–08:00 (local hospital time). Send the returned token on protected routes as `Authorization: Bearer <token>`. Call `DELETE /auth/session` to revoke it.
+Call `POST /auth/login` with `email` and `password`. Only enabled staff with credentials can log in; no public registration or OTP flow is available. Administrators create users with `POST /users` (`name`, `role`, `job_role`, optional contact `phone`, `email`, `password`) or set credentials for existing staff using `PUT /users/{id}/credentials` (`email`, `password`); resetting credentials revokes the user's sessions. On a fresh production database, run `bun run auth:bootstrap-admin` once with `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables (minimum 12 characters). When upgrading an existing database with multiple administrators, also set `ADMIN_USER_ID`. The migration revokes old OTP sessions. Authenticated staff change their own password with `POST /users/me/password` (`current_password`, `new_password`), which also logs out existing sessions. Duty doctors may select `shift: "morning" | "afternoon" | "night"` on `/auth/login`; the choice is informational and does not restrict access. Shift times are 08:00–14:00, 14:00–20:00 and 20:00–08:00 (local hospital time). Send the returned token on protected routes as `Authorization: Bearer <token>`. Call `DELETE /auth/session` to revoke it.
 
-Development and test accept any non-empty OTP for a registered phone. No real OTP provider exists. Production returns HTTP 503 from `/auth/request` and `/auth/verify`. Logs exclude the phone, OTP, and session token.
+Development/test seeds use name-based addresses such as `bruce+wayne@klinik.com` with shared password `password` (never use these demo credentials in production or send mail to them). Login failures return the same generic error for unknown addresses and wrong passwords, with process-local throttling. Use HTTPS and shared gateway rate limiting before exposing production login; session tokens and request bodies are redacted from logs.
+
+### Post-login session setup
+
+The web app first submits only email/password to `/auth/login`, then verifies identity with authenticated `GET /auth/session`, returning `{ user, shift }` (`shift` is nullable). User roles and job roles come from the current database user, never from request JSON or browser storage. Duty doctors and nurses select their shift after authentication using `PATCH /auth/session` with `{ "shift": "morning" | "afternoon" | "night" }`. The selection is stored on the current bearer session and survives refresh. Consultants and other non-shift staff do not need shift selection; attempting to PATCH a shift for those roles returns 403. Missing/expired/disabled sessions return 401. Shift remains informational, not a clinical permission or a substitute for chart/session authorization. The login-time duty-doctor shift option remains supported for older clients.
 
 ## Flow
 
@@ -57,7 +61,7 @@ Development and test accept any non-empty OTP for a registered phone. No real OT
 
 **Roles:** `doctor`, `nurse`, `admin`
 
-Staff creation requires a non-empty name and a phone number. A duplicate phone returns HTTP 409. Only the `administrator` job role has user-management permission.
+Staff creation requires a non-empty name, unique email, and a password of at least 12 characters. Phone is optional contact information. A duplicate email or phone returns HTTP 409. Only the `administrator` job role has user-management permission.
 
 ---
 

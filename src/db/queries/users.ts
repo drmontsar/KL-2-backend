@@ -1,4 +1,5 @@
 import { DomainError } from '../../errors';
+import { hashPassword } from '../../security/password';
 import { db } from '../index';
 
 export type User = {
@@ -16,6 +17,7 @@ export type User = {
   registration_number: string | null;
   specialization: string | null;
   phone: string | null;
+  email?: string | null;
   current_area: string | null;
   last_seen_at: Date | null;
   created_at: Date;
@@ -30,32 +32,37 @@ export async function createUser(data: {
   job_role?: User['job_role'];
   registration_number?: string;
   specialization?: string;
-  phone: string;
+  phone?: string;
+  email?: string;
+  password?: string;
 }): Promise<User> {
-  let row: User;
+  if (Boolean(data.email) !== Boolean(data.password)) throw new Error('email and password must be provided together');
+  const passwordHash = data.password ? await hashPassword(data.password) : null;
   try {
-    [row] = await db<User[]>`
-    INSERT INTO staff.users (name, role, job_role, registration_number, specialization, phone)
-    VALUES (
-      ${data.name},
-      ${data.role},
-      ${data.job_role ?? (data.role === 'doctor' ? 'duty_doctor' : data.role === 'nurse' ? 'staff_nurse' : 'administrator')},
-      ${data.registration_number ?? null},
-      ${data.specialization ?? null},
-      ${data.phone ?? null}
-    )
-    RETURNING *
-  `;
+    return await db.begin(async (tx) => {
+      const [row] = await tx<User[]>`
+        INSERT INTO staff.users (name, role, job_role, registration_number, specialization, phone)
+        VALUES (
+          ${data.name}, ${data.role},
+          ${data.job_role ?? (data.role === 'doctor' ? 'duty_doctor' : data.role === 'nurse' ? 'staff_nurse' : 'administrator')},
+          ${data.registration_number ?? null}, ${data.specialization ?? null}, ${data.phone ?? null}
+        ) RETURNING *
+      `;
+      if (passwordHash) await tx`
+        INSERT INTO staff.user_credentials (user_id, email, password_hash)
+        VALUES (${row.id}, ${data.email!}, ${passwordHash})
+      `;
+      return { ...row, email: data.email ?? null };
+    });
   } catch (error) {
     if ((error as { code?: string }).code === '23505') throw new DomainError('conflict');
     throw error;
   }
-  return row;
 }
 
 export async function getUserById(id: string): Promise<User | null> {
   const [row] = await db<User[]>`
-    SELECT * FROM staff.users WHERE id = ${id}
+    SELECT u.*, c.email FROM staff.users u LEFT JOIN staff.user_credentials c ON c.user_id = u.id WHERE u.id = ${id}
   `;
   return row ?? null;
 }
@@ -63,13 +70,14 @@ export async function getUserById(id: string): Promise<User | null> {
 export function listUsers(role?: User['role']): Promise<User[]> {
   if (role) {
     return db<User[]>`
-      SELECT * FROM staff.users
-      WHERE role = ${role} AND disabled_at IS NULL
-      ORDER BY name
+      SELECT u.*, c.email FROM staff.users u LEFT JOIN staff.user_credentials c ON c.user_id = u.id
+      WHERE u.role = ${role} AND u.disabled_at IS NULL
+      ORDER BY u.name
     `;
   }
   return db<User[]>`
-    SELECT * FROM staff.users WHERE disabled_at IS NULL ORDER BY name
+    SELECT u.*, c.email FROM staff.users u LEFT JOIN staff.user_credentials c ON c.user_id = u.id
+    WHERE u.disabled_at IS NULL ORDER BY u.name
   `;
 }
 

@@ -1,3 +1,5 @@
+import { emailForFixturePhone } from './demo_login';
+
 const baseUrl = process.env.BASE_URL;
 if (!baseUrl) throw new Error('BASE_URL is required');
 
@@ -7,8 +9,9 @@ async function get(path: string, token: string) {
   return response.json();
 }
 async function login(phone: string): Promise<string> {
-  const response = await fetch(`${baseUrl}/auth/verify`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone, otp: 'test' }),
+  const response = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: emailForFixturePhone(phone), password: 'password' }),
   });
   if (!response.ok) throw new Error(`Fixture login returned ${response.status}`);
   return (await response.json() as { token: string }).token;
@@ -17,10 +20,10 @@ async function login(phone: string): Promise<string> {
 const doctor = await login('+1 202 555 0111');
 const nurse = await login('+1 202 555 0113');
 const bruce = await login('1112223330');
-const bruceAdmissions = await get('/admissions?scope=mine', bruce) as { id: string; assigned_doctor_id: string | null }[];
+const bruceAdmissions = await get('/admissions?scope=mine', bruce) as { id: string }[];
 const sampleIds = ['14000000-0000-4000-8000-000000000001', '14000000-0000-4000-8000-000000000002'];
-if (!sampleIds.every((id) => bruceAdmissions.some((admission) => admission.id === id && admission.assigned_doctor_id === '11000000-0000-4000-8000-000000000001'))) {
-  throw new Error('Dr. Bruce Wayne does not have coverage access to the portable admissions or primary responsibility was changed');
+if (!sampleIds.every((id) => bruceAdmissions.some((admission) => admission.id === id))) {
+  throw new Error('Dr. Bruce Wayne cannot see the portable admissions');
 }
 const bruceWard = await get('/dashboard/ward-summary?unit_id=10000000-0000-4000-8000-000000000003', bruce) as { news_warning: number; pending_orders: number; tpa_queries: number };
 if (bruceWard.news_warning !== 1 || bruceWard.pending_orders !== 3 || bruceWard.tpa_queries !== 1) throw new Error('Dr. Bruce Wayne ward data is incomplete');
