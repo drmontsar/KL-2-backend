@@ -94,6 +94,7 @@ const CreateOrderBody = z.object({
   payload: z.record(z.string(), z.unknown()),
   priority: z.enum(['routine', 'urgent', 'stat']).optional(),
   requires_approval: z.boolean().optional(),
+  advised_by: z.string().uuid().optional(),
 });
 
 const ListQuery = z.object({
