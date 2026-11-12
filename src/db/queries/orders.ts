@@ -38,6 +38,9 @@ export type Order = {
   status: 'draft' | 'confirmed' | 'cancelled' | 'completed' | 'discontinued';
   revision: number;
   created_by: string;
+  advised_by: string | null;
+  advised_by_name?: string | null;
+  ordered_by_name?: string | null;
   created_at: Date;
   confirmed_by: string | null;
   confirmed_at: Date | null;
@@ -77,14 +80,19 @@ export async function createOrder(data: {
   payload: Record<string, unknown>;
   priority?: Order['priority'];
   requires_approval?: boolean;
+  advised_by?: string;
   created_by: string;
 }): Promise<Order> {
   return db
     .begin(async (tx) => {
       await lockActiveAdmission(tx, data.admission_id);
+      if (data.advised_by) {
+        const [advisor] = await tx`SELECT id FROM staff.users WHERE id = ${data.advised_by} AND role = 'doctor' AND disabled_at IS NULL FOR SHARE`;
+        if (!advisor) throw new DomainError('invalid_order_advisor');
+      }
       const [row] = await tx<Order[]>`
-      INSERT INTO clinical.orders (admission_id, kind, payload, priority, created_by, requires_approval, approval_status)
-      VALUES (${data.admission_id}, ${data.kind}, ${tx.json(data.payload as unknown as Json)}, ${data.priority ?? 'routine'}, ${data.created_by}, ${data.requires_approval ?? false}, ${data.requires_approval ? 'pending' : 'not_required'})
+      INSERT INTO clinical.orders (admission_id, kind, payload, priority, created_by, advised_by, requires_approval, approval_status)
+      VALUES (${data.admission_id}, ${data.kind}, ${tx.json(data.payload as unknown as Json)}, ${data.priority ?? 'routine'}, ${data.created_by}, ${data.advised_by ?? null}, ${data.requires_approval ?? false}, ${data.requires_approval ? 'pending' : 'not_required'})
       RETURNING *
     `;
       await tx`
@@ -102,15 +110,21 @@ export function listOrdersByAdmission(
 ): Promise<Order[]> {
   if (status) {
     return db<Order[]>`
-      SELECT * FROM clinical.orders
-      WHERE admission_id = ${admission_id} AND status = ${status}
-      ORDER BY created_at DESC
+      SELECT o.*, advisor.name AS advised_by_name, creator.name AS ordered_by_name
+      FROM clinical.orders o
+      LEFT JOIN staff.users advisor ON advisor.id = o.advised_by
+      LEFT JOIN staff.users creator ON creator.id = o.created_by
+      WHERE o.admission_id = ${admission_id} AND o.status = ${status}
+      ORDER BY o.created_at DESC
     `;
   }
   return db<Order[]>`
-    SELECT * FROM clinical.orders
-    WHERE admission_id = ${admission_id}
-    ORDER BY created_at DESC
+    SELECT o.*, advisor.name AS advised_by_name, creator.name AS ordered_by_name
+    FROM clinical.orders o
+    LEFT JOIN staff.users advisor ON advisor.id = o.advised_by
+    LEFT JOIN staff.users creator ON creator.id = o.created_by
+    WHERE o.admission_id = ${admission_id}
+    ORDER BY o.created_at DESC
   `;
 }
 
