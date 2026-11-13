@@ -789,6 +789,7 @@ admissionsRouter.openapi(
 
 const VitalsListQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
+  before: z.uuid().optional(),
 });
 
 const RecordVitalsBody = z
@@ -904,8 +905,8 @@ admissionsRouter.openapi(
     if (!(await getAdmissionForUser(id, user))) {
       return c.json({ error: 'not found or forbidden' }, 403);
     }
-    const { limit } = c.req.valid('query');
-    const vitals = await listVitalsByAdmission(id, limit);
+    const { limit, before } = c.req.valid('query');
+    const vitals = await listVitalsByAdmission(id, limit, before);
     return c.json(vitals, 200);
   },
 );
@@ -952,7 +953,7 @@ admissionsRouter.openapi(
     method: 'get',
     path: '/{id}/observations',
     tags: ['Observations'],
-    request: { params: IdParam, query: VitalsListQuery },
+    request: { params: IdParam, query: VitalsListQuery.omit({ before: true }) },
     responses: {
       403: {
         content: { 'application/json': { schema: ErrorSchema } },
