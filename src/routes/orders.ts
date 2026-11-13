@@ -254,6 +254,8 @@ tasksRouter.openapi(
   async (c) => {
     const { id } = c.req.valid('param');
     const user = c.get('user');
+    if (!hasPermission(user, 'clinical.nurse'))
+      return c.json({ error: 'nursing access required' }, 403);
     if (!(await canAccessResource(user, 'task', id)))
       return c.json({ error: 'not found or forbidden' }, 403);
     const task = await completeTask({ task_id: id, completed_by: user.id });
@@ -323,6 +325,8 @@ tasksRouter.openapi(
   async (c) => {
     const { id } = c.req.valid('param');
     const user = c.get('user');
+    if (!hasPermission(user, 'clinical.nurse'))
+      return c.json({ error: 'nursing access required' }, 403);
     if (!(await canAccessResource(user, 'task', id)))
       return c.json({ error: 'not found or forbidden' }, 403);
     const task = await cancelTask(id, user.id);
