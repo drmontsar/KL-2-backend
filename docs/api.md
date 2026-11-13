@@ -2,6 +2,22 @@
 
 This document lists the API endpoints and describes how each role uses them.
 
+## Progress-note drafts and author stamps (migration 064)
+
+- Notes accept `documentation_status: draft | saved` (default `saved`). Private drafts are visible/editable only to their author; draft context never applies diagnoses and cannot be confirmed as a note version.
+- Resume with `PATCH /notes/{id}/draft`, including numeric `expected_revision`, `draft_body`, optional `clinical_context`, and documentation status. Incomplete observation context is allowed in drafts only. Revision conflicts retain the existing server record.
+- Saving a draft atomically applies its explicit clinical context, captures server `saved_at`, updates `updated_at`, and stamps authenticated staff name, designation/job role and registration number in `author_stamp`. Client-supplied timestamps or author stamps are ignored. Drafts have null `saved_at`; draft save time is `updated_at`.
+- Note revisions are serialized as numbers, matching the public contract (PostgreSQL bigint is not exposed as a JSON string).
+- An author stamp is an auditable attribution, not a cryptographic digital signature. Saving does not remove existing clinical confirmation/revision checks.
+- Apply migration `064_progress_note_drafts.sql` after 063. These migrations were verified only in disposable test databases, not applied to a live database.
+
+## Clinical context, signatures and discharge (migration 063)
+
+- `POST /admissions/{id}/notes` accepts optional `clinical_context` for doctors only: `provisional_diagnoses` (up to 20 descriptions), and paired `observation_frequency` / `observation_reason`. The note and deduplicated active provisional diagnoses are created in one audited transaction. Context is returned on notes. Narrative text is not interpreted; a saved note is not a signed observation order.
+- `POST /discharge-plans/{id}/summary` requires both nonblank `summary` and `final_diagnosis`; existing authorization and workflow checks remain.
+- `POST /forms/versions/{id}/signatures` requires `expected_revision` and normalized `strokes` (`[x,y]` points in `[0,1]`, 1–24 strokes, 2–1000 points each, up to 10000 total). Blank ink and stale versions are rejected. Vector ink is stored privately in the existing clinical database with version/field/signing audit information. Doctor/consultant identities are session-derived. Existing legal approval limitations remain; handwriting capture is not a certified digital signature. Existing legacy attestations have no ink.
+- Apply migration `063_note_context_forms_and_discharge.sql` and restart the backend before deploying the new frontend. Migration 062 is reserved for the separate chat worktree; this change has no dependency on chat tables. No live migration is applied by frontend verification.
+
 ## Base
 
 The server runs on port 3001 by default. Set the `PORT` environment variable to use a different port.
@@ -44,7 +60,9 @@ The web app first submits only email/password to `/auth/login`, then verifies id
 2. Once the patient is physically in bed, the assigned nurse may call `POST /admissions/{id}/confirm-in-bed`; duty doctors may also confirm arrival manually.
 3. Write notes on an assigned admission. Use `POST /admissions/{id}/notes`.
 4. View pending tasks. Use `GET /admissions/{id}/tasks?status=pending`.
-5. Complete a task. Use `POST /tasks/{id}/complete`.
+5. Nurses complete a task using `POST /tasks/{id}/complete`. Task completion and cancellation require `clinical.nurse`; doctors can read task status but cannot mutate nursing tasks.
+
+`GET /admissions/{id}/vitals` supports `limit` (1–100) and optional `before` (the UUID of the last returned vital). Pages preserve `recorded_at DESC, event_order DESC` ordering, including equal timestamps. The cursor is resolved only within the authorized admission. Existing clients without `before` retain the same response format.
 
 ---
 
@@ -118,7 +136,7 @@ Nurses can give or hold scheduled doses at `/medication-doses/{id}/give` and `/h
 
 ### Forms prototype
 
-`GET/POST /forms/templates` lists or creates synthetic templates. `POST /forms/instances` creates a patient form and snapshots known fields; retrieve patient forms at `/forms/patients/{id}/instances`, version history at `/forms/instances/{id}/versions`, and version/signatures at `/forms/versions/{id}`. Drafts can be saved, signatures captured, finalized, and copied to a new version with signatures cleared. The built-in templates and signatures are **demo-only and not legal consent or clinical documents**. Consultant signature requests, correction routing, and document rendering/storage remain unavailable.
+`GET/POST /forms/templates` lists or creates synthetic templates. `POST /forms/instances` creates a patient form and snapshots known fields; retrieve patient forms at `/forms/patients/{id}/instances`, version history at `/forms/instances/{id}/versions`, and version/signatures at `/forms/versions/{id}`. Drafts can be saved, signatures captured, finalized, and copied to a new version with signatures cleared. The starter templates are **not hospital-approved legal consent or clinical documents**. Handwritten signatures now support finger, stylus, mouse and keyboard capture; certification, identity proofing and hospital legal approval are not supplied by this prototype. Consultant signature requests, correction routing, and document rendering/storage remain unavailable.
 
 ### Claims and deposits
 
@@ -132,7 +150,7 @@ These actions do not contact an insurer or process payments. Discharge billing r
 
 Initial doctor assessment: `GET /admissions/initial-assessment-required` returns admitted active patients whose `doctor_assessment` checklist item is pending; incoming patients appear once the assigned nurse or a duty doctor confirms them in bed. `GET /admissions/{id}/initial-assessment` returns the signed assessment or `null` to authorized staff. `POST /admissions/{id}/initial-assessment` is duty-doctor-only and requires nonempty `chief_complaint`, `history`, `examination`, `clinical_impression`, and `plan`. It signs a single assessment, records the author/time, and completes `doctor_assessment` in one transaction. Repeated submissions return 409; editing a signed assessment is not yet supported (document corrections using a separate clinical note). The assessment checklist is required but does not block emergency orders or other clinical endpoints.
 
-`POST /patient-movements` requests a permanent or temporary move. Permanent moves require `/patient-movements/{id}/reserve` by bed desk/admin; `/depart`, `/arrive`, `/return`, and `/cancel` perform state transitions. Reservations block other bed assignments, temporary moves retain the source bed, and NEWS2 ≥ 5 requires a nurse or doctor escort. A current NEWS2 assessment is required before movement.
+`POST /patient-movements` requests a permanent or temporary move. Temporary visits can only be requested, departed, returned or cancelled by an authorized nurse (`clinical.nurse`); doctor/consultant attempts return 403. Doctors retain read access where patient scope permits. Temporary visits depart and return; `/arrive` applies only to permanent moves. Permanent moves require `/patient-movements/{id}/reserve` by bed desk/admin; `/depart`, `/arrive`, `/return`, and `/cancel` perform state transitions. Reservations block other bed assignments, temporary moves retain the source bed, and NEWS2 ≥ 5 requires a nurse or doctor escort. A current NEWS2 assessment is required before movement.
 
 ### Staged discharge
 
