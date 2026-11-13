@@ -43,6 +43,7 @@ patientMovementsRouter.openapi(
     const user = c.get('user');
     const body = c.req.valid('json');
     if (
+      (body.movement_type === 'temporary' && !hasPermission(user, 'clinical.nurse')) ||
       (!hasPermission(user, 'clinical.doctor') && !hasPermission(user, 'clinical.nurse')) ||
       !(await canAccessAdmission(user, body.admission_id))
     )
@@ -148,6 +149,7 @@ for (const action of ['depart', 'arrive', 'return', 'cancel'] as const) {
       const [existing] = await getPatientMovement(id);
       if (
         !existing ||
+        (existing.movement_type === 'temporary' && !hasPermission(user, 'clinical.nurse')) ||
         (!hasPermission(user, 'clinical.doctor') && !hasPermission(user, 'clinical.nurse')) ||
         !(await canAccessAdmission(user, existing.admission_id))
       )
