@@ -93,7 +93,7 @@ export async function createHandoverSession(data: {
               FROM clinical.shift_events se
               WHERE se.admission_id = a.id AND se.logged_at > now() - interval '24 hours'
             ), '[]'::json)  AS shift_events,
-            (SELECT n.draft_body FROM clinical.notes n WHERE n.admission_id = a.id ORDER BY n.created_at DESC LIMIT 1) AS latest_note
+            (SELECT n.draft_body FROM clinical.notes n WHERE n.admission_id = a.id AND n.documentation_status = 'saved' ORDER BY COALESCE(n.saved_at, n.created_at) DESC LIMIT 1) AS latest_note
           FROM clinical.admissions a
           JOIN clinical.patients p ON p.id = a.patient_id
           WHERE a.status = 'active'
@@ -124,7 +124,7 @@ export async function createHandoverSession(data: {
               FROM clinical.shift_events se
               WHERE se.admission_id = a.id AND se.logged_at > now() - interval '24 hours'
             ), '[]'::json)  AS shift_events,
-            (SELECT n.draft_body FROM clinical.notes n WHERE n.admission_id = a.id ORDER BY n.created_at DESC LIMIT 1) AS latest_note
+            (SELECT n.draft_body FROM clinical.notes n WHERE n.admission_id = a.id AND n.documentation_status = 'saved' ORDER BY COALESCE(n.saved_at, n.created_at) DESC LIMIT 1) AS latest_note
           FROM clinical.admissions a
           JOIN clinical.patients p ON p.id = a.patient_id
           WHERE a.status = 'active'

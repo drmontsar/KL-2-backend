@@ -14,6 +14,7 @@ import {
 } from '../../contracts/forms';
 import { rethrowDatabaseError } from '../errors';
 import { db } from '../index';
+import { DomainError } from '../../errors';
 import { canAccessPatient } from './access';
 import type { User } from './users';
 
@@ -166,7 +167,8 @@ export async function signFormField(id: string, body: SignBodyInput, user: User)
       const [version] = await tx<
         Version[]
       >`SELECT * FROM forms.instance_versions WHERE id = ${id} AND status = 'draft' FOR UPDATE`;
-      if (!version) return null;
+      if (!version || version.status !== 'draft') return null;
+      if (Number(version.revision) !== body.expected_revision) throw new DomainError('conflict');
       const field = version.fields.find(
         (item) => item.key === body.field_key && item.type === 'signature',
       );
@@ -186,7 +188,7 @@ export async function signFormField(id: string, body: SignBodyInput, user: User)
       const signerName = field.signer_role === 'patient' ? body.signer_name : user.name;
       const [signature] = await tx<
         Signature[]
-      >`INSERT INTO forms.signatures (version_id, field_key, role, signer_name, captured_by) VALUES (${id}, ${body.field_key}, ${field.signer_role}, ${signerName}, ${user.id}) RETURNING *`;
+      >`INSERT INTO forms.signatures (version_id, field_key, role, signer_name, captured_by, strokes) VALUES (${id}, ${body.field_key}, ${field.signer_role}, ${signerName}, ${user.id}, ${tx.json(body.strokes as Json)}) RETURNING *`;
       await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${user.id}, 'sign', 'forms.signatures', ${signature.id}, ${tx.json(signature as unknown as Json)})`;
       return signature;
     })

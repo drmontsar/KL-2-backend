@@ -8,6 +8,7 @@ import {
   NoteVersionSchema,
 } from '../contracts/common';
 import { UpdateDraftBody } from '../contracts/notes';
+import { hasPermission } from '../authorization';
 import { canAccessResource } from '../db/queries/access';
 import { addAmendment, confirmNote, listNoteVersions, updateNoteDraft } from '../db/queries/notes';
 import type { User } from '../db/queries/users';
@@ -60,7 +61,9 @@ notesRouter.openapi(
     if (!(await canAccessResource(c.get('user'), 'note', id)))
       return c.json({ error: 'not found or forbidden' }, 403);
     const { draft_body, expected_revision } = c.req.valid('json');
-    const note = await updateNoteDraft(id, draft_body, expected_revision, c.get('user').id);
+    const changes = c.req.valid('json');
+    if ((changes.clinical_context || changes.documentation_status) && !hasPermission(c.get('user'), 'clinical.doctor')) return c.json({error:'not found or forbidden'},403);
+    const note = await updateNoteDraft(id, draft_body, expected_revision, c.get('user').id, undefined, changes);
     if (!note) {
       return c.json({ error: 'not found' }, 404);
     }

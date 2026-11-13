@@ -199,7 +199,7 @@ export async function acceptIpassItem(
         SELECT (${admission.revision}::bigint <> ${item.snapshot_revision}::bigint
           OR ${admission.arrival_status} <> ${item.arrival_status}
           OR EXISTS (SELECT 1 FROM clinical.vitals v WHERE v.admission_id = ${item.admission_id} AND v.recorded_at > ${item.signed_at}::timestamptz)
-          OR EXISTS (SELECT 1 FROM clinical.notes n WHERE n.admission_id = ${item.admission_id} AND n.created_at > ${item.signed_at}::timestamptz)
+          OR EXISTS (SELECT 1 FROM clinical.notes n WHERE n.admission_id = ${item.admission_id} AND n.documentation_status = 'saved' AND COALESCE(n.saved_at, n.created_at) > ${item.signed_at}::timestamptz)
           OR EXISTS (SELECT 1 FROM clinical.orders o WHERE o.admission_id = ${item.admission_id} AND (o.created_at > ${item.signed_at}::timestamptz OR o.confirmed_at > ${item.signed_at}::timestamptz))
           OR EXISTS (SELECT 1 FROM clinical.initial_assessments ia WHERE ia.admission_id = ${item.admission_id} AND ia.signed_at > ${item.signed_at}::timestamptz)
         ) AS changed

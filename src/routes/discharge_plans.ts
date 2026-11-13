@@ -226,7 +226,7 @@ dischargePlansRouter.openapi(
       !(await canAccessAdmission(user, plan.admission_id))
     )
       return c.json({ error: 'not found or forbidden' }, 403);
-    const result = await signDischargeSummary(body.summary, user.id, id);
+    const result = await signDischargeSummary(body.summary, user.id, id, body.final_diagnosis);
     if (!result) return c.json({ error: 'plan unavailable or summary already signed' }, 409);
     return c.json(result, 200);
   },
