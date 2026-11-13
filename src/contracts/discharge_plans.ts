@@ -10,6 +10,7 @@ export const PlanSchema = z.object({
   follow_up: z.string(),
   form_version_id: z.string().uuid().nullable(),
   summary: z.string().nullable(),
+  final_diagnosis: z.string().nullable(),
   summary_signed_by: z.string().uuid().nullable(),
   summary_signed_at: z.string().nullable(),
   requested_by: z.string().uuid(),
@@ -48,7 +49,10 @@ export const CreateBody = z.object({
   form_version_id: z.string().uuid().optional(),
 });
 
-export const SummaryBody = z.object({ summary: z.string().trim().min(1).max(30000) });
+export const SummaryBody = z.object({
+  summary: z.string().trim().min(1).max(30000),
+  final_diagnosis: z.string().trim().min(1).max(5000),
+});
 
 export const TaskBody = z.object({ evidence: z.string().trim().min(1).max(10000) });
 

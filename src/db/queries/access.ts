@@ -73,5 +73,8 @@ export async function canAccessResource(
   id: string,
 ): Promise<boolean> {
   const admissionId = await resourceAdmissionId(type, id);
-  return admissionId ? canAccessAdmission(user, admissionId) : user.job_role === 'administrator';
+  const allowed = admissionId ? await canAccessAdmission(user, admissionId) : user.job_role === 'administrator';
+  if (!allowed || type !== 'note') return allowed;
+  const [note] = await db`SELECT documentation_status, created_by FROM clinical.notes WHERE id = ${id}`;
+  return Boolean(note && (note.documentation_status !== 'draft' || note.created_by === user.id));
 }

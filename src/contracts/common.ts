@@ -109,11 +109,24 @@ export const DiagnosisSchema = z.object({
   created_at: z.string(),
 });
 
+export const ClinicalContextDraftSchema = z.object({
+  provisional_diagnoses: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
+  observation_frequency: z.string().trim().min(1).max(200).optional(),
+  observation_reason: z.string().trim().min(1).max(2000).optional(),
+});
+export const ClinicalContextSchema = ClinicalContextDraftSchema.refine(value => Boolean(value.observation_frequency) === Boolean(value.observation_reason),
+  'Observation frequency and clinical reason must be provided together');
+
 export const NoteSchema = z.object({
   id: z.string().uuid(),
   admission_id: z.string().uuid(),
   kind: z.string(),
   draft_body: z.string().nullable(),
+  clinical_context: ClinicalContextDraftSchema.nullable().optional(),
+  documentation_status: z.enum(['draft','saved']).optional(),
+  saved_at: z.string().nullable().optional(),
+  updated_at: z.string().optional(),
+  author_stamp: z.object({ user_id: z.string().uuid(), name: z.string(), designation: z.string(), registration_number: z.string().nullable() }).nullable().optional(),
   revision: z.number(),
   created_by: z.string(),
   created_at: z.string(),

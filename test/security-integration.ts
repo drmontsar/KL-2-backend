@@ -656,11 +656,11 @@ const formSave = await request(`/forms/versions/${formVersion.id}`, doctor1.toke
 });
 assert(formSave.ok, `form draft save returned ${formSave.status}`);
 const formSignature = await request(`/forms/versions/${formVersion.id}/signatures`, doctor1.token, {
-  method: 'POST', body: JSON.stringify({ field_key: 'doctor_signature', signer_name: 'Demo doctor' }),
+  method: 'POST', body: JSON.stringify({ field_key: 'doctor_signature', signer_name: 'Demo doctor', expected_revision: formVersion.revision + 1, strokes: [[[0.1, 0.2], [0.5, 0.6]]] }),
 });
 assert(formSignature.status === 201, `form signature returned ${formSignature.status}`);
 const patientSignature = await request(`/forms/versions/${formVersion.id}/signatures`, doctor1.token, {
-  method: 'POST', body: JSON.stringify({ field_key: 'patient_signature', signer_name: 'Test Patient' }),
+  method: 'POST', body: JSON.stringify({ field_key: 'patient_signature', signer_name: 'Test Patient', expected_revision: formVersion.revision + 1, strokes: [[[0.2, 0.3], [0.6, 0.5]]] }),
 });
 assert(patientSignature.status === 201, `patient signature returned ${patientSignature.status}`);
 const formFinal = await request(`/forms/versions/${formVersion.id}/finalize`, doctor1.token, { method: 'POST' });
@@ -861,7 +861,7 @@ assert(insuredPlanResponse.status === 201, `insured discharge plan returned ${in
 const insuredPlan = await insuredPlanResponse.json() as { id: string };
 const insuredApproval = await request(`/discharge-plans/${insuredPlan.id}/approve`, doctor2.token, { method: 'POST' });
 assert(insuredApproval.ok, `insured discharge approval returned ${insuredApproval.status}`);
-const insuredSummary = await request(`/discharge-plans/${insuredPlan.id}/summary`, admin.token, { method: 'POST', body: JSON.stringify({ summary: 'Demo discharge summary' }) });
+const insuredSummary = await request(`/discharge-plans/${insuredPlan.id}/summary`, admin.token, { method: 'POST', body: JSON.stringify({ summary: 'Demo discharge summary', final_diagnosis: 'Test final diagnosis' }) });
 assert(insuredSummary.ok, `insured discharge summary returned ${insuredSummary.status}`);
 const insuredDetail = await request(`/discharge-plans/${insuredPlan.id}`, admin.token);
 const insuredTasks = (await insuredDetail.json() as { tasks: { id: string; code: string }[] }).tasks;
@@ -1135,7 +1135,7 @@ const dischargeApprove = await request(`/discharge-plans/${dischargePlan.id}/app
 assert(dischargeApprove.ok, `discharge approval returned ${dischargeApprove.status}`);
 const dischargeEarly = await request(`/discharge-plans/${dischargePlan.id}/complete`, admin.token, { method: 'POST' });
 assert(dischargeEarly.status === 409, `discharge bypassed checklist (${dischargeEarly.status})`);
-const dischargeSummary = await request(`/discharge-plans/${dischargePlan.id}/summary`, admin.token, { method: 'POST', body: JSON.stringify({ summary: 'Demo discharge summary' }) });
+const dischargeSummary = await request(`/discharge-plans/${dischargePlan.id}/summary`, admin.token, { method: 'POST', body: JSON.stringify({ summary: 'Demo discharge summary', final_diagnosis: 'Test final diagnosis' }) });
 assert(dischargeSummary.ok, `discharge summary returned ${dischargeSummary.status}`);
 const dischargeDetailResponse = await request(`/discharge-plans/${dischargePlan.id}`, admin.token);
 const dischargeDetail = await dischargeDetailResponse.json() as { tasks: { id: string; code: string }[] };

@@ -94,12 +94,13 @@ export async function approveDischargePlan(actor_user_id: string, id: string) {
     .catch(rethrowDatabaseError);
 }
 
-export async function signDischargeSummary(summary: string, actor_user_id: string, id: string) {
+export async function signDischargeSummary(summary: string, actor_user_id: string, id: string, final_diagnosis: string) {
+  if (!final_diagnosis.trim()) return null;
   return db
     .begin(async (tx) => {
       const [row] = await tx<
         Plan[]
-      >`UPDATE clinical.discharge_plans SET summary = ${summary}, summary_signed_by = ${actor_user_id}, summary_signed_at = now(), revision = revision + 1 WHERE id = ${id} AND status IN ('pending_approval','approved') AND summary_signed_at IS NULL RETURNING *`;
+      >`UPDATE clinical.discharge_plans SET summary = ${summary}, final_diagnosis = ${final_diagnosis.trim()}, summary_signed_by = ${actor_user_id}, summary_signed_at = now(), revision = revision + 1 WHERE id = ${id} AND status IN ('pending_approval','approved') AND summary_signed_at IS NULL RETURNING *`;
       if (!row) return null;
       await tx`UPDATE clinical.discharge_tasks SET status = 'completed', evidence = 'Summary signed', completed_by = ${actor_user_id}, completed_at = now() WHERE plan_id = ${id} AND code = 'summary' AND status = 'pending'`;
       await tx`INSERT INTO clinical.audit_log (actor_user_id, action, record_table, record_id, after) VALUES (${actor_user_id}, 'sign_summary', 'clinical.discharge_plans', ${id}, ${tx.json(row as unknown as Json)})`;

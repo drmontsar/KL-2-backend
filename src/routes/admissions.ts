@@ -2,6 +2,7 @@ import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from 'zod';
 import { hasPermission } from '../authorization';
 import { UpdateDraftBody } from '../contracts/notes';
+import { ClinicalContextDraftSchema } from '../contracts/common';
 import { canAccessResource } from '../db/queries/access';
 import {
   assignAdmission,
@@ -78,7 +79,9 @@ const CreateDiagnosisBody = z.object({ description: z.string() });
 const CreateNoteBody = z.object({
   kind: z.string(),
   draft_body: z.string().optional(),
-});
+  clinical_context: ClinicalContextDraftSchema.optional(),
+  documentation_status: z.enum(['draft','saved']).optional(),
+}).refine(data => data.documentation_status === 'draft' || !data.clinical_context || Boolean(data.clinical_context.observation_frequency) === Boolean(data.clinical_context.observation_reason), 'Observation frequency and clinical reason must be provided together');
 
 const CreateOrderBody = z.object({
   kind: z.enum([
@@ -555,7 +558,7 @@ admissionsRouter.openapi(
     const { id } = c.req.valid('param');
     if (!(await getAdmissionForUser(id, c.get('user'))))
       return c.json({ error: 'not found or forbidden' }, 403);
-    const notes = await listNotesByAdmission(id);
+    const notes = await listNotesByAdmission(id, c.get('user').id);
     return c.json(notes, 200);
   },
 );
@@ -586,6 +589,8 @@ admissionsRouter.openapi(
     if (!(await getAdmissionForUser(id, user)))
       return c.json({ error: 'not found or forbidden' }, 403);
     const data = c.req.valid('json');
+    if ((data.clinical_context || data.documentation_status) && !hasPermission(user, 'clinical.doctor'))
+      return c.json({ error: 'not found or forbidden' }, 403);
     const note = await createNote({ ...data, admission_id: id, created_by: user.id });
     return c.json(note, 201);
   },
@@ -635,7 +640,9 @@ admissionsRouter.openapi(
       return c.json({ error: 'not found or forbidden' }, 403);
     }
     const { draft_body, expected_revision } = c.req.valid('json');
-    const note = await updateNoteDraft(noteId, draft_body, expected_revision, user.id, id);
+    const changes = c.req.valid('json');
+    if ((changes.clinical_context || changes.documentation_status) && !hasPermission(user, 'clinical.doctor')) return c.json({error:'not found or forbidden'},403);
+    const note = await updateNoteDraft(noteId, draft_body, expected_revision, user.id, id, changes);
     if (!note) {
       return c.json({ error: 'not found' }, 404);
     }

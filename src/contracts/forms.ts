@@ -65,7 +65,13 @@ export const SaveBody = z.object({
   form_values: z.record(z.string(), z.unknown()),
 });
 
+export const SignatureStrokes = z.array(z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(2).max(1000)).min(1).max(24)
+  .refine(strokes => strokes.reduce((total, stroke) => total + stroke.length, 0) <= 10000, 'Signature is too large')
+  .refine(strokes => strokes.some(stroke => stroke.some(point => point[0] !== stroke[0][0] || point[1] !== stroke[0][1])), 'Draw a signature');
+
 export const SignBody = z.object({
+  expected_revision: z.number().int().positive(),
+  strokes: SignatureStrokes,
   field_key: z.string(),
   signer_name: z.string().trim().min(1).max(200),
 });
@@ -78,6 +84,7 @@ export const SignatureSchema = z.object({
   signer_name: z.string(),
   captured_by: z.string().uuid(),
   signed_at: z.string(),
+  strokes: SignatureStrokes.nullable().optional(),
 });
 
 export const DetailSchema = z.object({
