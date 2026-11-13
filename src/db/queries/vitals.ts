@@ -349,10 +349,14 @@ export function listObservationsByAdmission(admission_id: string, limit = 20): P
   `;
 }
 
-export function listVitalsByAdmission(admission_id: string, limit = 20): Promise<Vitals[]> {
+export function listVitalsByAdmission(admission_id: string, limit = 20, before?: string): Promise<Vitals[]> {
   return db<Vitals[]>`
     SELECT * FROM clinical.vitals
     WHERE admission_id = ${admission_id}
+      AND (${before ?? null}::uuid IS NULL OR (recorded_at, event_order) < (
+        SELECT recorded_at, event_order FROM clinical.vitals
+        WHERE id = ${before ?? null}::uuid AND admission_id = ${admission_id}
+      ))
     ORDER BY recorded_at DESC, event_order DESC
     LIMIT ${limit}
   `;
